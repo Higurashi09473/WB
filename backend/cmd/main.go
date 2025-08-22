@@ -1,8 +1,10 @@
 package main
 
-import "WB/backend/internal"
+import (
+	"WB/internal"
+)
 
-func main()  {
+func main() {
 	app := internal.App{}
 	app.Init()
 }
