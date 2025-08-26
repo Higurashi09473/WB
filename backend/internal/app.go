@@ -14,7 +14,6 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/redis/go-redis/v9"
 
-	// "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -33,8 +32,6 @@ func (a *App) Init(ctx context.Context) {
 	a.setupHttp()
 
 	go a.runConsumer(ctx)
-
-	// log.Fatal(a.HttpServer.Listen(":3000"))
 }
 
 func (a *App) SetupDb() {
@@ -117,7 +114,6 @@ func (a *App) setupHttp() {
 			log.Printf("Заказ %s не найден в Redis, проверяем PostgreSQL", orderUID)
 		}
 
-		// Fetch from PostgreSQL
 		order, err := a.getOrderFromPostgres(orderUID)
 		if err != nil {
 			log.Printf("Заказ %s не найден в PostgreSQL", orderUID)
@@ -140,7 +136,7 @@ func (a *App) setupHttp() {
 			})
 		}
 
-		// Validate required fields
+		// Валидация
 		if order.OrderUID == "" || order.TrackNumber == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "OrderUID and TrackNumber are required",
