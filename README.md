@@ -137,9 +137,10 @@ WB
 │   ├── cmd
 │   │   └── main.go
 │   ├── deployments
-│   │   ├── data
-│   │   ├── docker-compose.yml
-│   │   └── postgres-data
+│   │   ├── kafka-data
+│   │   ├── postgres-data
+│   │   ├── redis-data
+│   │   └── docker-compose.yml
 │   ├── internal
 │   │   ├── app.go
 │   │   ├── model
@@ -150,6 +151,8 @@ WB
 │   │           └── producer.go
 │   ├── pkg
 │   │   └── database
+│   │       ├── migrations
+│   │       │   └── 20250828155143_create_initial_tables.sql
 │   │       └── schema.sql
 │   ├── static
 │   │   └── index.html
