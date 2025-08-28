@@ -4,10 +4,10 @@ import (
 	"WB/internal/model"
 	"WB/internal/service/kafka"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -15,6 +15,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib" // Регистрация драйвера pgx для database/sql
+	"github.com/pressly/goose/v3"
 )
 
 type App struct {
@@ -45,22 +47,24 @@ func (a *App) SetupDb() {
 	}
 	a.Database = pool
 
-	// Чтение SQL-схемы из файла
-	sqlBytes, err := os.ReadFile("./pkg/database/schema.sql")
+	db, err := sql.Open("pgx", connStr)
 	if err != nil {
-		log.Fatalf("не удалось прочитать файл схемы: %v", err)
+		log.Fatalf("не удалось открыть соединение database/sql: %v", err)
 	}
-	createTablesSQL := string(sqlBytes)
+	defer db.Close() // Закрываем database/sql соединение после миграций
 
-	// Выполнение SQL для создания таблиц
-	commandTag, err := a.Database.Exec(context.Background(), createTablesSQL)
+	// Путь к файлам миграций
+	migrationsPath := "./pkg/database/migrations"
+
+	// Выполнение миграций
+	err = goose.Up(db, migrationsPath)
 	if err != nil {
-		log.Fatalf("не удалось выполнить схему: %v", err)
+		log.Fatalf("не удалось применить миграции: %v", err)
 	}
 
 	// Логирование результата
-	log.Printf("Схема базы данных успешно инициализирована. Команда: %s, Затронуто строк: %d",
-		commandTag.String(), commandTag.RowsAffected())
+	log.Println("Миграции успешно применены")
+
 }
 
 func (a *App) SetupRedis() {
@@ -244,7 +248,7 @@ func (a *App) runConsumer(ctx context.Context) error {
 		default:
 			// Чтение сообщения из Kafka
 			key, value, err := a.KafkaConsumer.Consume(ctx)
-			
+
 			if err != nil {
 				log.Printf("Ошибка при получении сообщения из Kafka: %v, остановка консьюмера", err)
 				a.KafkaConsumer.Close()
