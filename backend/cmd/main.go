@@ -6,16 +6,18 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
 	defer cancel()
 
 	app := internal.App{}
-	app.Init(ctx)
+	app.Init(ctx, wg)
 
 	go func() {
 		if err := app.HttpServer.Listen(":3000"); err != nil {
@@ -32,6 +34,7 @@ func main() {
 		log.Printf("Received signal: %s, initiating shutdown...", sig)
 
 		cancel()
+
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 		defer cancel() 
@@ -59,6 +62,7 @@ func main() {
 			app.KafkaProducer.Close()
 			log.Println("Kafka producer closed")
 		}
+		wg.Wait()
 		log.Println("Application shutdown complete")
 		os.Exit(0)
 	}()

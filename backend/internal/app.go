@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -27,13 +28,14 @@ type App struct {
 	KafkaConsumer *kafka.Consumer
 }
 
-func (a *App) Init(ctx context.Context) {
+func (a *App) Init(ctx context.Context, wg *sync.WaitGroup) {
 	a.SetupDb()
 	a.SetupRedis()
 	a.SetupKafka()
 	a.setupHttp()
 
-	go a.runConsumer(ctx)
+	wg.Add(1)
+	go a.runConsumer(ctx, wg)
 }
 
 func (a *App) SetupDb() {
@@ -235,7 +237,7 @@ func (a *App) getOrderFromPostgres(orderUID string) (model.Order, error) {
 	return order, nil
 }
 
-func (a *App) runConsumer(ctx context.Context) error {
+func (a *App) runConsumer(ctx context.Context, wg *sync.WaitGroup) error {
 	const maxRetries = 3
 	const retryDelay = 5 * time.Second
 
@@ -244,15 +246,15 @@ func (a *App) runConsumer(ctx context.Context) error {
 		case <-ctx.Done():
 			log.Println("Получен сигнал завершения, остановка консьюмера")
 			a.KafkaConsumer.Close()
+			wg.Done()
 			return nil
 		default:
 			// Чтение сообщения из Kafka
 			key, value, err := a.KafkaConsumer.Consume(ctx)
 
 			if err != nil {
-				log.Printf("Ошибка при получении сообщения из Kafka: %v, остановка консьюмера", err)
-				a.KafkaConsumer.Close()
-				return nil
+				log.Printf("Ошибка при получении сообщения из Kafka: %v", err)
+				continue
 			}
 
 			// Парсинг JSON
