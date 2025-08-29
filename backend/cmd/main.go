@@ -12,12 +12,12 @@ import (
 )
 
 func main() {
-	consumerCtx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	defer cancel()
 
 	app := internal.App{}
-	app.Init(consumerCtx, wg)
+	app.Init(ctx, wg)
 
 	go func() {
 		if err := app.HttpServer.Listen(":3000"); err != nil {
@@ -36,7 +36,7 @@ func main() {
 	cancel()
 
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel() 
 
 	if err := app.HttpServer.ShutdownWithContext(ctx); err != nil {
@@ -65,5 +65,4 @@ func main() {
 	wg.Wait()
 	log.Println("Application shutdown complete")
 	os.Exit(0)
-	
 }
