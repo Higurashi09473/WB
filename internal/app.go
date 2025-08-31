@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"WB/internal/config"
 	"WB/internal/model"
 	"WB/internal/service/kafka"
 	"context"
@@ -39,8 +40,17 @@ func (a *App) Init(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 func (a *App) SetupDb() {
+	cfg, err := config.ParseEnv()
+	if err != nil {
+		log.Fatalf("Ошибки при загрузке .env файла: %v", err)
+	}
+
 	// Строка подключения к базе данных
-	connStr := "postgresql://user:password@localhost:5432/mydatabase"
+	connStr := fmt.Sprintf("postgresql://%s:%s@localhost:5432/%s",
+		cfg.PostgresUser,
+		cfg.PostgresPass,
+		cfg.PostgresDB,
+	)
 
 	// Инициализация пула подключений
 	pool, err := pgxpool.New(context.Background(), connStr)

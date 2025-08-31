@@ -23,6 +23,7 @@ require (
 	github.com/gofiber/utils/v2 v2.0.0-beta.13 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgx/v5 v5.7.5
+	github.com/joho/godotenv v1.5.1
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

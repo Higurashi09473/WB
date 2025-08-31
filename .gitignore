@@ -1,1 +1,2 @@
-backend/deployments/kafka-data/*
+deployments/kafka-data/*
+deployments/redis-data/*
