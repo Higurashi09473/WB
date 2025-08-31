@@ -133,31 +133,29 @@ make docker-down
 
 ```plaintext
 WB
-├── backend
-│   ├── cmd
-│   │   └── main.go
-│   ├── deployments
-│   │   ├── kafka-data
-│   │   ├── postgres-data
-│   │   ├── redis-data
-│   │   └── docker-compose.yml
-│   ├── internal
-│   │   ├── app.go
-│   │   ├── model
-│   │   │   └── order.go
-│   │   └── service
-│   │       └── kafka
-│   │           ├── consumer.go
-│   │           └── producer.go
-│   ├── pkg
-│   │   └── database
-│   │       ├── migrations
-│   │       │   └── 20250828155143_create_initial_tables.sql
-│   │       └── schema.sql
-│   ├── static
-│   │   └── index.html
-│   ├── go.mod
-│   ├── go.sum
-│   └── Makefile
+├── cmd
+│   └── main.go
+├── deployments
+│   ├── kafka-data
+│   ├── postgres-data
+│   ├── redis-data
+│   └── docker-compose.yml
+├── internal
+│   ├── app.go
+│   ├── model
+│   │   └── order.go
+│   └── service
+│       └── kafka
+│           ├── consumer.go
+│           └── producer.go
+├── pkg
+│   └── database
+│       ├── migrations
+│       │   └── 20250828155143_create_initial_tables.sql
+├── static
+│   └── index.html
+├── go.mod
+├── go.sum
+├──  Makefile
 └── README.md
 ```
