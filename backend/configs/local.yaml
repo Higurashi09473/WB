@@ -1,0 +1,14 @@
+env: "local" #local, dev, prod
+storage_path: "./storage/storage.db"
+migrations_path: "./migrations"
+
+http_server:
+  address: "localhost:8888"
+  timeout: 4s
+  idle_timeout: 60s
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
