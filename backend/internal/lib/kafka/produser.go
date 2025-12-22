@@ -22,9 +22,16 @@ func NewProducer(brokers []string, topic string) (*Producer, error) {
         AllowAutoTopicCreation: true,
     }
 
-    return &Producer{
-        writer: writer,
-    }, nil
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    conn, err := kafka.DialContext(ctx, "tcp", brokers[0]) // подключаемся хотя бы к одному брокеру
+    if err != nil {
+        return nil, fmt.Errorf("failed to dial kafka broker %s: %w", brokers[0], err)
+    }
+    defer conn.Close()
+
+    return &Producer{writer: writer}, nil
 }
 
 func (p *Producer) Send(ctx context.Context, key string, value []byte) error {

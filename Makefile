@@ -1,4 +1,4 @@
-DOCKER_COMPOSE_FILE=./deployments/docker-compose.yml
+DOCKER_COMPOSE_FILE=./backend/docker/docker-compose.yml
 
 run:
 	go run ./cmd/main.go

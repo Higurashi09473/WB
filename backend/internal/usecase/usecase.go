@@ -41,7 +41,7 @@ func (uc *OrderUseCase) CreateOrder(ctx context.Context, order models.Order) err
 	if err := validator.ValidateOrder(&order); err != nil {
 		return err
 	}
-
+	
 	orderJSON, err := json.Marshal(order)
 	if err != nil {
 		return err

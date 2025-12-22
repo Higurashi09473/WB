@@ -30,7 +30,6 @@ func main() {
 	//load cfg
 	cfg := config.MustLoad()
 
-	//init loger
 	log := slogpretty.SetupLogger(cfg.Env)
 	log.Info("starting server", slog.String("env", cfg.Env))
 
@@ -55,7 +54,7 @@ func main() {
 
 	kafkaProducer, err := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topic)
 	if err != nil {
-		log.Error("Failed to initialize Kafka producer:", sl.Err(err))
+		log.Error("failed to initialize Kafka producer:", sl.Err(err))
 		os.Exit(1)
 	}
 
@@ -66,12 +65,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// ErrGroup для управления всеми горутинами
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error{
-		log.Info("Запуск Kafka consumer...")
-		return kafkaConsumer.Start(context.Background(), orderUseCase.HandleMessage)
+		log.Info("starting Kafka consumer...")
+		return kafkaConsumer.Start(ctx, orderUseCase.HandleMessage)
 	})
 
 	router := chi.NewRouter()
@@ -80,7 +78,7 @@ func main() {
 	router.Use(middleware.Logger)
 	router.Use(mwLogger.New(log))
 	router.Use(middleware.Recoverer)
-	router.Use(middleware.URLFormat)
+	// router.Use(middleware.URLFormat)
 
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:*"},
@@ -91,10 +89,11 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	router.Post("/order/new", handlers.NewOrder(log, orderUseCase))
-	router.Get("/order/{id}", handlers.GetOrder(log, orderUseCase))
-
-	log.Info("starting server", slog.String("address", cfg.Address))
+	router.Post("/api/create_order", handlers.NewOrder(log, orderUseCase))
+	router.Get("/api/orders/{id}", handlers.GetOrder(log, orderUseCase))
+	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "web/static/index.html")
+	})
 
 	srv := &http.Server{
 		Addr:         cfg.Address,
@@ -106,12 +105,13 @@ func main() {
 
 	g.Go(func() error {
 		log.Info("starting HTTP server", slog.String("address", cfg.Address))
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Error("HTTP server error", sl.Err(err))
 			return err
 		}
 		return nil
 	})
+
 	<-ctx.Done()
 	log.Info("shutting down gracefully...")
 

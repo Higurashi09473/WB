@@ -21,10 +21,9 @@ func New(cfg *config.Config) (*Redis, error) {
 		DB:           cfg.DB,
 	})
 
-	_, err := client.Ping(context.Background()).Result()
-
-	if err != nil {
-        return nil, fmt.Errorf("%s: %w", op, err)
+	if err := client.Ping(context.Background()).Err(); err != nil {
+        client.Close() 
+        return nil, fmt.Errorf("%s: ping failed: %w", op, err)
     }
 	
 	return &Redis{Client: client}, nil
@@ -34,6 +33,8 @@ func (r *Redis) Close() error{
 	return r.Client.Close()
 }
 
+
+//нету
 func (r *Redis) GetOrder(ctx context.Context, orderUID string) ([]byte, error){
 	return nil, nil
 }

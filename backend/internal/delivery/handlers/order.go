@@ -17,6 +17,8 @@ func NewOrder(log *slog.Logger, orderUseCase *usecase.OrderUseCase) http.Handler
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.order.NewOrder"
 
+		ctx := r.Context()
+
 		var order models.Order
 
 		log := log.With(
@@ -30,7 +32,7 @@ func NewOrder(log *slog.Logger, orderUseCase *usecase.OrderUseCase) http.Handler
 			return
 		}
 
-		if err := orderUseCase.CreateOrder(context.Background(), order); err != nil {
+		if err := orderUseCase.CreateOrder(ctx, order); err != nil {
 			log.Error("failed to unmarshal order", "op", op, "error", err)
 			render.JSON(w, r, resp.Error(err.Error()))
 			return
