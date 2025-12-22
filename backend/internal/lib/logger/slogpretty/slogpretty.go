@@ -5,9 +5,17 @@ import (
 	"encoding/json"
 	"io"
 	stdLog "log"
+	"os"
+
+	"log/slog"
 
 	"github.com/fatih/color"
-	"log/slog"
+)
+
+const (
+	envLocal = "local"
+	envDev   = "dev"
+	envProd  = "prod"
 )
 
 type PrettyHandlerOptions struct {
@@ -95,4 +103,35 @@ func (h *PrettyHandler) WithGroup(name string) slog.Handler {
 		Handler: h.Handler.WithGroup(name),
 		l:       h.l,
 	}
+}
+
+func SetupLogger(env string) *slog.Logger {
+	var log *slog.Logger
+
+	switch env {
+	case envLocal:
+		log = setupPrettySlog()
+	case envDev:
+		log = slog.New(
+			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}),
+		)
+	case envProd:
+		log = slog.New(
+			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}),
+		)
+	}
+
+	return log
+}
+
+func setupPrettySlog() *slog.Logger {
+	opts := PrettyHandlerOptions{
+		SlogOpts: &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		},
+	}
+
+	handler := opts.NewPrettyHandler(os.Stdout)
+
+	return slog.New(handler)
 }

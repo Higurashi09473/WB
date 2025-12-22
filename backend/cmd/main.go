@@ -4,24 +4,26 @@ import (
 	"WB/internal/config"
 	"WB/internal/delivery/handlers"
 	mwLogger "WB/internal/delivery/middleware/logger"
+	kafka "WB/internal/lib/kafka"
 	"WB/internal/lib/logger/sl"
 	"WB/internal/lib/logger/slogpretty"
 	"WB/internal/repository/postgres"
 	"WB/internal/repository/redis"
+	usecase "WB/internal/usecase"
+	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
-)
-
-const (
-	envLocal = "local"
-	envDev   = "dev"
-	envProd  = "prod"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -29,7 +31,7 @@ func main() {
 	cfg := config.MustLoad()
 
 	//init loger
-	log := setupLogger(cfg.Env)
+	log := slogpretty.SetupLogger(cfg.Env)
 	log.Info("starting server", slog.String("env", cfg.Env))
 
 	connStr := "user=user password=password dbname=mydatabase sslmode=disable host=localhost port=5432"
@@ -39,35 +41,39 @@ func main() {
 		os.Exit(1)
 	}
 
-	//init postgres
-	storage, err := postgres.New(db, cfg.MigrationsPath)
+	orderRepo, err := postgres.New(db, cfg.MigrationsPath)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
 	}
-	defer func() {
-		if err := storage.Close(); err != nil {
-			log.Error("failed to init redis", sl.Err(err))
-			os.Exit(1)
-		}
-	}()
 
-
-	//инит редис
 	redisConn, err := redis.New(cfg)
-	if err != nil{
+	if err != nil {
 		log.Error("failed to init redis", sl.Err(err))
 		os.Exit(1)
 	}
-	defer func() {
-		if err := redisConn.Close(); err != nil {
-			log.Error("failed to close redis", sl.Err(err))
-		}
-	}()
 
-	//запуск консьюмера
+	kafkaProducer, err := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topic)
+	if err != nil {
+		log.Error("Failed to initialize Kafka producer:", sl.Err(err))
+		os.Exit(1)
+	}
 
-	//запуск продюссера
+	orderUseCase := usecase.NewOrderUseCase(orderRepo, redisConn, kafkaProducer)
+
+	kafkaConsumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.ConsumerGroup, cfg.Kafka.Topic)
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// ErrGroup для управления всеми горутинами
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error{
+		log.Info("Запуск Kafka consumer...")
+		return kafkaConsumer.Start(context.Background(), orderUseCase.HandleMessage)
+	})
+
 	router := chi.NewRouter()
 
 	router.Use(middleware.RequestID)
@@ -85,10 +91,8 @@ func main() {
 		MaxAge:           300,
 	}))
 
-
-	router.Post("/order/new", handlers.NewOrder(log, storage))
-	router.Get("/order/{id}", handlers.GetOrder(log, storage))
-
+	router.Post("/order/new", handlers.NewOrder(log, orderUseCase))
+	router.Get("/order/{id}", handlers.GetOrder(log, orderUseCase))
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 
@@ -100,44 +104,38 @@ func main() {
 		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
 	}
 
-	if err := srv.ListenAndServe(); err != nil {
-		log.Error(err.Error())
+	g.Go(func() error {
+		log.Info("starting HTTP server", slog.String("address", cfg.Address))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error("HTTP server error", sl.Err(err))
+			return err
+		}
+		return nil
+	})
+	<-ctx.Done()
+	log.Info("shutting down gracefully...")
 
-		log.Error("failed to start server")
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Error("HTTP server forced shutdown", sl.Err(err))
 	}
 
-	log.Error("server stopped")
-
-	// грейсфулл шотдаун
-}
-
-func setupLogger(env string) *slog.Logger {
-	var log *slog.Logger
-
-	switch env {
-	case envLocal:
-		log = setupPrettySlog()
-	case envDev:
-		log = slog.New(
-			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}),
-		)
-	case envProd:
-		log = slog.New(
-			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}),
-		)
+	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+		log.Error("error during shutdown", sl.Err(err))
 	}
 
-	return log
-}
-
-func setupPrettySlog() *slog.Logger {
-	opts := slogpretty.PrettyHandlerOptions{
-		SlogOpts: &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		},
+	log.Info("closing resources...")
+	if err := db.Close(); err != nil {
+		log.Error("error closing database", sl.Err(err))
+	}
+	if err := redisConn.Close(); err != nil {
+		log.Error("error closing redis", sl.Err(err))
+	}
+	if err := kafkaProducer.Close(); err != nil {
+		log.Error("error closing kafka producer", sl.Err(err))
 	}
 
-	handler := opts.NewPrettyHandler(os.Stdout)
-
-	return slog.New(handler)
+	log.Info("server stopped gracefully")
 }

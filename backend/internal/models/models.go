@@ -3,9 +3,9 @@ package models
 import "time"
 
 type Order struct {
-    OrderUID          string    `json:"order_uid" validate:"required,len=32"`
+    OrderUID          string    `json:"order_uid" validate:"required"`
     TrackNumber       string    `json:"track_number" validate:"required"`
-    Entry             string    `json:"entry" validate:"required,oneof=WBWay SCS WB"`
+    Entry             string    `json:"entry" validate:"required"`
     Delivery          Delivery  `json:"delivery" validate:"required"`
     Payment           Payment   `json:"payment" validate:"required"`
     Items             []Item    `json:"items" validate:"required,gt=0,dive"`
@@ -30,7 +30,7 @@ type Delivery struct {
 }
 
 type Payment struct {
-    Transaction   string `json:"transaction" validate:"required,len=36"`
+    Transaction   string `json:"transaction" validate:"required"`
     RequestID     string `json:"request_id" validate:"omitempty"`
     Currency      string `json:"currency" validate:"required,len=3"`
     Provider      string `json:"provider" validate:"required"`

@@ -2,8 +2,9 @@ package handlers
 
 import (
 	resp "WB/internal/lib/api/response"
-	"WB/internal/lib/validator"
 	"WB/internal/models"
+	usecase "WB/internal/usecase"
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -12,12 +13,7 @@ import (
 	"github.com/go-chi/render"
 )
 
-type OrderRepository interface {
-	NewOrder(order models.Order) error
-	GetOrder(orderID string) (models.Order, error)
-}
-
-func NewOrder(log *slog.Logger, orderRepository OrderRepository) http.HandlerFunc {
+func NewOrder(log *slog.Logger, orderUseCase *usecase.OrderUseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.order.NewOrder"
 
@@ -34,14 +30,7 @@ func NewOrder(log *slog.Logger, orderRepository OrderRepository) http.HandlerFun
 			return
 		}
 
-		if err := validator.ValidateOrder(&order); err != nil {
-			log.Info("validation failed", "error", err)
-			render.JSON(w, r, resp.Error("validation failed: "+err.Error()))
-			return
-		}
-
-		err := orderRepository.NewOrder(order)
-		if err != nil {
+		if err := orderUseCase.CreateOrder(context.Background(), order); err != nil {
 			log.Error("failed to unmarshal order", "op", op, "error", err)
 			render.JSON(w, r, resp.Error(err.Error()))
 			return
@@ -52,7 +41,7 @@ func NewOrder(log *slog.Logger, orderRepository OrderRepository) http.HandlerFun
 	}
 }
 
-func GetOrder(log *slog.Logger, orderRepository OrderRepository) http.HandlerFunc {
+func GetOrder(log *slog.Logger, orderUseCase *usecase.OrderUseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.order.GetOrder"
 
@@ -70,7 +59,7 @@ func GetOrder(log *slog.Logger, orderRepository OrderRepository) http.HandlerFun
 			return
 		}
 
-		order, err := orderRepository.GetOrder(OrderID)
+		order, err := orderUseCase.GetOrder(context.Background(), OrderID)
 		if err != nil {
 			log.Error("failed to unmarshal order", "op", op, "error", err)
 			render.JSON(w, r, resp.Error(err.Error()))

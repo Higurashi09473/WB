@@ -38,6 +38,6 @@ func (p *Producer) Send(ctx context.Context, key string, value []byte) error {
     return nil
 }
 
-func (p *Producer) Close() {
-    p.writer.Close()
+func (p *Producer) Close() error{
+    return p.writer.Close()
 }

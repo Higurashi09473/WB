@@ -7,6 +7,11 @@ http_server:
   timeout: 4s
   idle_timeout: 60s
 
+kafka:
+  brokers: ["localhost:9092"]
+  consumer_group: orders-group
+  topic: orders
+
 redis:
   host: localhost
   port: 6379

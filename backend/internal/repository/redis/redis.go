@@ -33,3 +33,7 @@ func New(cfg *config.Config) (*Redis, error) {
 func (r *Redis) Close() error{
 	return r.Client.Close()
 }
+
+func (r *Redis) GetOrder(ctx context.Context, orderUID string) ([]byte, error){
+	return nil, nil
+}
