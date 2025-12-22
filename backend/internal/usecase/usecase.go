@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	kafka "WB/internal/lib/kafka"
 	"WB/internal/lib/validator"
@@ -16,8 +17,8 @@ type OrderRepository interface {
 
 type CacheRepository interface {
 	GetOrder(ctx context.Context, orderUID string) ([]byte, error)
-	// SetOrder(ctx context.Context, orderUID string, data []byte, ttl time.Duration) error
-	// DeleteOrder(ctx context.Context, orderUID string) error
+	SetOrder(ctx context.Context, orderUID string, data []byte, ttl time.Duration) error
+	DeleteOrder(ctx context.Context, orderUID string) error
 }
 
 // OrderUseCase — основной юзкейс для работы с заказами
@@ -57,16 +58,14 @@ func (uc *OrderUseCase) CreateOrder(ctx context.Context, order models.Order) err
 
 // GetOrder — получает заказ по UID: сначала из Redis, потом из PostgreSQL, с кэшированием
 func (uc *OrderUseCase) GetOrder(ctx context.Context, orderUID string) (models.Order, error) {
-	// 1. Пытаемся взять из Redis (быстрый кэш)
-	// cached, err := uc.cacheRepo.GetOrder(ctx, orderUID)
-	// if err == nil && len(cached) > 0 {
-	// 	var order models.Order
-	// 	if jsonErr := json.Unmarshal(cached, &order); jsonErr == nil {
-	// 		return order, nil
-	// 	}
-	// 	// Если JSON повреждён — удаляем кэш и идём в БД
-	// 	uc.cacheRepo.DeleteOrder(ctx, orderUID)
-	// }
+	cached, err := uc.cacheRepo.GetOrder(ctx, orderUID)
+	if err == nil && len(cached) > 0 {
+		var order models.Order
+		if jsonErr := json.Unmarshal(cached, &order); jsonErr == nil {
+			return order, nil
+		}
+		uc.cacheRepo.DeleteOrder(ctx, orderUID)
+	}
 
 	// 2. Если нет в кэше — берём из PostgreSQL
 	order, err := uc.orderRepo.GetOrder(orderUID)
@@ -78,10 +77,10 @@ func (uc *OrderUseCase) GetOrder(ctx context.Context, orderUID string) (models.O
 	}
 
 	// 3. Кэшируем в Redis на 24 часа (или другой TTL)
-	// orderJSON, marshalErr := json.Marshal(order)
-	// if marshalErr == nil {
-	// 	_ = uc.cacheRepo.SetOrder(ctx, orderUID, orderJSON, 24*time.Hour)
-	// }
+	orderJSON, marshalErr := json.Marshal(order)
+	if marshalErr == nil {
+		_ = uc.cacheRepo.SetOrder(ctx, orderUID, orderJSON, 24*time.Hour)
+	}
 
 	return order, nil
 }
@@ -97,7 +96,6 @@ func (uc *OrderUseCase) HandleMessage(ctx context.Context, key string, value []b
 	//     log.Printf("Предупреждение: key (%s) не совпадает с order_uid (%s)", key, order.OrderUID)
 	// }
 
-	// Идемпотентность: проверяем, не обработан ли уже заказ
 	if _, err := uc.orderRepo.GetOrder(order.OrderUID); err == nil {
 		// log.Printf("Заказ %s уже существует — пропускаем", order.OrderUID)
 		return nil
@@ -106,18 +104,15 @@ func (uc *OrderUseCase) HandleMessage(ctx context.Context, key string, value []b
 	//     return err // ошибка БД — нужно повторить
 	// }
 
-	// Сохраняем в БД
 	if err := uc.orderRepo.NewOrder(order); err != nil {
-		// log.Printf("Ошибка сохранения заказа %s в БД: %v", order.OrderUID, err)
-		return err // retry
+		return err 
 	}
 
 	// Кэшируем в Redis
-	// orderJSON, _ := json.Marshal(order)
-	// if err := uc.cacheRepo.SetOrder(ctx, order.OrderUID, orderJSON, 24*time.Hour); err != nil {
-	//     // log.Printf("Ошибка кэширования заказа %s (некритично): %v", order.OrderUID, err)
-	//     // Не возвращаем ошибку — данные уже в БД
-	// }
+	orderJSON, _ := json.Marshal(order)
+	if err := uc.cacheRepo.SetOrder(ctx, order.OrderUID, orderJSON, 24*time.Hour); err != nil {
+
+	}
 
 	// log.Printf("Заказ %s успешно сохранён в БД и Redis", order.OrderUID)
 	return nil

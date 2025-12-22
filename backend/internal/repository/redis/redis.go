@@ -4,6 +4,7 @@ import (
 	"WB/internal/config"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -34,7 +35,38 @@ func (r *Redis) Close() error{
 }
 
 
-//нету
-func (r *Redis) GetOrder(ctx context.Context, orderUID string) ([]byte, error){
-	return nil, nil
+func (r *Redis) GetOrder(ctx context.Context, orderUID string) ([]byte, error) {
+	key := orderUID
+
+	data, err := r.Client.Get(ctx, key).Bytes()
+	if err != nil {
+		if err == redis.Nil {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return data, nil
+}
+
+func (r *Redis) SetOrder(ctx context.Context, orderUID string, data []byte, ttl time.Duration) error {
+	key := orderUID
+
+	err := r.Client.Set(ctx, key, data, ttl).Err()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Redis) DeleteOrder(ctx context.Context, orderUID string) error {
+	key := orderUID
+
+	err := r.Client.Del(ctx, key).Err()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
