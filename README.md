@@ -7,7 +7,7 @@
 
 ```
 Go 1.25 — Язык программирования
-Fiber — Высокопроизводительный HTTP-фреймворк
+Go-chi — популярный, легковесный и композируемый HTTP-маршрутизатор для языка программирования Go
 Goose - Инструмент для миграции базы данных
 Kafka (segmentio/kafka-go) — брокер сообщений
 PostgreSQL (pgx) — Хранилище данных
@@ -34,7 +34,7 @@ docker compose up -d
 
 2. Запуск сервиса
 ```
-go run ./cmd/app
+go run ./cmd/main.go
 ```
 
 # API
@@ -42,7 +42,7 @@ go run ./cmd/app
 ```
 Эндпоинт: POST /api/create_order
 Описание: Отправляет заказ в Kafka для обработки
-Пример:curl -X POST http://127.0.0.1:3000/api/create_order \
+Пример:curl -X POST http://127.0.0.1:8888/api/create_order \
 -H "Content-Type: application/json" \
 -d '{
    "order_uid": "b563feb7b2b84b6test",
@@ -100,7 +100,7 @@ go run ./cmd/app
 ```
 Эндпоинт: GET /api/orders/:order_uid
 Описание: Возвращает заказ из Redis или PostgreSQL
-Пример:curl http://localhost:3000/api/orders/b563feb7b2b84b6test
+Пример:curl http://localhost:8888/api/orders/b563feb7b2b84b6test
 ```
 
 
@@ -135,27 +135,52 @@ make docker-down
 WB
 ├── cmd
 │   └── main.go
-├── deployments
+├── configs
+│   └── local.yaml
+├── docker
+│   ├── docker-compose.yml
 │   ├── kafka-data
 │   ├── postgres-data
-│   ├── redis-data
-│   └── docker-compose.yml
-├── internal
-│   ├── app.go
-│   ├── model
-│   │   └── order.go
-│   └── service
-│       └── kafka
-│           ├── consumer.go
-│           └── producer.go
-├── pkg
-│   └── database
-│       ├── migrations
-│       │   └── 20250828155143_create_initial_tables.sql
-├── static
-│   └── index.html
+│   └── redis-data
 ├── go.mod
 ├── go.sum
-├──  Makefile
-└── README.md
+├── internal
+│   ├── config
+│   │   └── config.go
+│   ├── delivery
+│   │   ├── handlers
+│   │   │   └── order.go
+│   │   └── middleware
+│   │       └── logger
+│   │           └── logger.go
+│   ├── lib
+│   │   ├── api
+│   │   │   └── response
+│   │   │       └── response.go
+│   │   ├── kafka
+│   │   │   ├── consumer.go
+│   │   │   └── produser.go
+│   │   ├── logger
+│   │   │   ├── sl
+│   │   │   │   └── sl.go
+│   │   │   └── slogpretty
+│   │   │       └── slogpretty.go
+│   │   └── validator
+│   │       └── validator.go
+│   ├── models
+│   │   └── models.go
+│   ├── repository
+│   │   ├── postgres
+│   │   │   └── postgres.go
+│   │   └── redis
+│   │       └── redis.go
+│   └── usecase
+│       └── usecase.go
+├── migrations
+│   └── 20250828155143_create_initial_tables.sql
+└── web
+    └── static
+        └── index.html
+
+32 directories, 21 files
 ```
