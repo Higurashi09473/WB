@@ -34,7 +34,7 @@ func main() {
 	log.Info("starting server", slog.String("env", cfg.Env))
 
 	connStr := "user=user password=password dbname=mydatabase sslmode=disable host=localhost port=5432"
-	db, err := sql.Open("postgres", connStr)
+	db, err := sql.Open("pgx", connStr)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
