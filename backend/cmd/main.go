@@ -43,8 +43,6 @@ func main() {
 		cfg.Postgresql.Port,
 	)
 
-	
-	// maybe  reafactor
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
@@ -68,7 +66,6 @@ func main() {
 		log.Error("failed to initialize Kafka producer:", sl.Err(err))
 		os.Exit(1)
 	}
-	// maybe  reafactor
 
 	orderUseCase := usecase.NewOrderUseCase(orderRepo, redisConn, kafkaProducer)
 

@@ -3,6 +3,7 @@ package redis
 import (
 	"WB/internal/config"
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -19,7 +20,7 @@ func New(cfg *config.Config) (*Redis, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:         fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port),
 		Password:     cfg.Redis.Password,
-		DB:           cfg.DB,
+		DB:           cfg.Redis.DB,
 	})
 
 	if err := client.Ping(context.Background()).Err(); err != nil {
@@ -42,7 +43,7 @@ func (r *Redis) GetOrder(ctx context.Context, orderUID string) ([]byte, error) {
 
 	data, err := r.Client.Get(ctx, key).Bytes()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("%s: get failed: %w", op, err)
@@ -65,7 +66,7 @@ func (r *Redis) SetOrder(ctx context.Context, orderUID string, data []byte, ttl 
 }
 
 func (r *Redis) DeleteOrder(ctx context.Context, orderUID string) error {
-	const op = "storage.redis.SetOrder"
+	const op = "storage.redis.DeleteOrder"
 
 	key := orderUID
 
