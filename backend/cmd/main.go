@@ -55,7 +55,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	redisConn, err := redis.New(cfg)
+	redisConn, err := redis.New(cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.Password, cfg.Redis.DB)
 	if err != nil {
 		log.Error("failed to init redis", sl.Err(err))
 		os.Exit(1)

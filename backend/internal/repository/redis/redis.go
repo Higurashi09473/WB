@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"WB/internal/config"
 	"context"
 	"errors"
 	"fmt"
@@ -14,27 +13,26 @@ type Redis struct {
 	Client *redis.Client
 }
 
-func New(cfg *config.Config) (*Redis, error) {
+func New(host, port, password string, DB int) (*Redis, error) {
 	const op = "storage.redis.New"
 
 	client := redis.NewClient(&redis.Options{
-		Addr:         fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port),
-		Password:     cfg.Redis.Password,
-		DB:           cfg.Redis.DB,
+		Addr:     fmt.Sprintf("%s:%s", host, port),
+		Password: password,
+		DB:       DB,
 	})
 
 	if err := client.Ping(context.Background()).Err(); err != nil {
-        client.Close() 
-        return nil, fmt.Errorf("%s: ping failed: %w", op, err)
-    }
-	
+		client.Close()
+		return nil, fmt.Errorf("%s: ping failed: %w", op, err)
+	}
+
 	return &Redis{Client: client}, nil
 }
 
-func (r *Redis) Close() error{
+func (r *Redis) Close() error {
 	return r.Client.Close()
 }
-
 
 func (r *Redis) GetOrder(ctx context.Context, orderUID string) ([]byte, error) {
 	const op = "storage.redis.GetOrder"
