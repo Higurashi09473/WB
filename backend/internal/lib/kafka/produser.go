@@ -13,6 +13,8 @@ type Producer struct {
 }
 
 func NewProducer(brokers []string, topic string) (*Producer, error) {
+    const op = "kafka.produser.NewProducer"
+
     writer := &kafka.Writer{
         Addr:                   kafka.TCP(brokers...),
         Topic:                  topic,
@@ -25,9 +27,9 @@ func NewProducer(brokers []string, topic string) (*Producer, error) {
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
 
-    conn, err := kafka.DialContext(ctx, "tcp", brokers[0]) // подключаемся хотя бы к одному брокеру
+    conn, err := kafka.DialContext(ctx, "tcp", brokers[0])
     if err != nil {
-        return nil, fmt.Errorf("failed to dial kafka broker %s: %w", brokers[0], err)
+        return nil, fmt.Errorf("%s: failed to dial kafka broker %s: %w", op, brokers[0], err)
     }
     defer conn.Close()
 
@@ -35,12 +37,14 @@ func NewProducer(brokers []string, topic string) (*Producer, error) {
 }
 
 func (p *Producer) Send(ctx context.Context, key string, value []byte) error {
+    const op = "kafka.produser.Send"
+
     err := p.writer.WriteMessages(ctx, kafka.Message{
         Key:   []byte(key),
         Value: value,
     })
     if err != nil {
-        return fmt.Errorf("failed to send message: %w", err)
+        return fmt.Errorf("%s: failed to send message: %w", op, err)
     }
     return nil
 }

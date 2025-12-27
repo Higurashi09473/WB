@@ -36,6 +36,8 @@ func (r *Redis) Close() error{
 
 
 func (r *Redis) GetOrder(ctx context.Context, orderUID string) ([]byte, error) {
+	const op = "storage.redis.GetOrder"
+
 	key := orderUID
 
 	data, err := r.Client.Get(ctx, key).Bytes()
@@ -43,29 +45,33 @@ func (r *Redis) GetOrder(ctx context.Context, orderUID string) ([]byte, error) {
 		if err == redis.Nil {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("%s: get failed: %w", op, err)
 	}
 
 	return data, nil
 }
 
 func (r *Redis) SetOrder(ctx context.Context, orderUID string, data []byte, ttl time.Duration) error {
+	const op = "storage.redis.SetOrder"
+
 	key := orderUID
 
 	err := r.Client.Set(ctx, key, data, ttl).Err()
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: set failed: %w", op, err)
 	}
 
 	return nil
 }
 
 func (r *Redis) DeleteOrder(ctx context.Context, orderUID string) error {
+	const op = "storage.redis.SetOrder"
+
 	key := orderUID
 
 	err := r.Client.Del(ctx, key).Err()
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: del failed: %w", op, err)
 	}
 
 	return nil

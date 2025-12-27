@@ -19,6 +19,7 @@ kafka:
   brokers: ["localhost:9092"]
   consumer_group: orders-group
   topic: orders
+  dlq_topic: "DLQ"
 
 redis:
   host: localhost

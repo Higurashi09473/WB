@@ -35,6 +35,7 @@ type Kafka struct {
 	Brokers       []string `yaml:"brokers"`
 	ConsumerGroup string   `yaml:"consumer_group"`
 	Topic         string   `yaml:"topic"`
+	DLQTopic      string   `yaml:"dlq_topic"`
 }
 
 type Postgresql struct {

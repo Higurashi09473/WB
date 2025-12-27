@@ -71,7 +71,7 @@ func (s *Storage) NewOrder(order models.Order) (error){
         return fmt.Errorf("%s: insert payment: %w", op, err)
     }
 
-    // 3. Orders (основная таблица)
+    // 3. Orders
     _, err = tx.Exec(`
         INSERT INTO orders (order_uid, track_number, entry, delivery_uid, payment_transaction, locale, internal_signature, customer_id, delivery_service, shardkey, sm_id, date_created, oof_shard)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
@@ -108,6 +108,7 @@ func (s *Storage) NewOrder(order models.Order) (error){
 func (s *Storage) GetOrder(orderId string) (models.Order, error){
 	const op = "storage.postgres.GetOrder"
 
+	// 1. Orders
 	var order models.Order
 	err := s.db.QueryRow(`
 		SELECT order_uid, track_number, entry, payment_transaction, locale, internal_signature, customer_id, 
@@ -117,9 +118,10 @@ func (s *Storage) GetOrder(orderId string) (models.Order, error){
 		&order.InternalSignature, &order.CustomerID, &order.DeliveryService,
 		&order.Shardkey, &order.SmID, &order.DateCreated, &order.OofShard)
 	if err != nil {
-		return models.Order{}, err
+		return models.Order{}, fmt.Errorf("%s: get orders: %w", op, err)
 	}
 
+	// 2. Delivery
 	err = s.db.QueryRow(`
 		SELECT name, phone, zip, city, address, region, email
 		FROM delivery WHERE order_uid = $1`, orderId).Scan(
@@ -127,9 +129,10 @@ func (s *Storage) GetOrder(orderId string) (models.Order, error){
 		&order.Delivery.City, &order.Delivery.Address, &order.Delivery.Region,
 		&order.Delivery.Email)
 	if err != nil {
-		return models.Order{}, err
+		return models.Order{}, fmt.Errorf("%s: get delivery: %w", op, err)
 	}
 
+	// 3. Payment
 	err = s.db.QueryRow(`
 		SELECT request_id, currency, provider, amount, payment_dt, 
 				bank, delivery_cost, goods_total, custom_fee
@@ -139,14 +142,15 @@ func (s *Storage) GetOrder(orderId string) (models.Order, error){
 		&order.Payment.Bank, &order.Payment.DeliveryCost, &order.Payment.GoodsTotal,
 		&order.Payment.CustomFee)
 	if err != nil {
-		return models.Order{}, err
+		return models.Order{}, fmt.Errorf("%s: get payment: %w", op, err)
 	}
 
+	// 4. Items
 	rows, err := s.db.Query(`
 		SELECT chrt_id, track_number, price, rid, name, sale, size, total_price, nm_id, brand, status
 		FROM items WHERE order_uid = $1`, orderId)
 	if err != nil {
-		return models.Order{}, err
+		return models.Order{}, fmt.Errorf("%s: get items: %w", op, err)
 	}
 	defer rows.Close()
 
@@ -156,7 +160,7 @@ func (s *Storage) GetOrder(orderId string) (models.Order, error){
 		if err := rows.Scan(&item.ChrtID, &item.TrackNumber, &item.Price, &item.Rid,
 			&item.Name, &item.Sale, &item.Size, &item.TotalPrice,
 			&item.NmID, &item.Brand, &item.Status); err != nil {
-			return models.Order{}, err
+			return models.Order{}, fmt.Errorf("%s: get items: %w", op, err)
 		}
 		order.Items = append(order.Items, item)
 	}
