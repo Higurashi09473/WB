@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -64,4 +65,10 @@ func MustLoad() *Config {
 	}
 
 	return &cfg
+}
+
+
+func (p Postgresql) DSN() string {
+	return fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s host=%s port=%d",
+        p.User, p.Password, p.DBname, p.SSLmode, p.Host, p.Port)
 }

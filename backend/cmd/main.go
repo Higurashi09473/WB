@@ -13,7 +13,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -28,22 +27,12 @@ import (
 )
 
 func main() {
-	//load cfg
 	cfg := config.MustLoad()
 
 	log := slogpretty.SetupLogger(cfg.Env)
 	log.Info("starting server", slog.String("env", cfg.Env))
 
-	connStr := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s host=%s port=%d",
-		cfg.Postgresql.User,
-		cfg.Postgresql.Password,
-		cfg.Postgresql.DBname,
-		cfg.Postgresql.SSLmode,
-		cfg.Postgresql.Host,
-		cfg.Postgresql.Port,
-	)
-
-	db, err := sql.Open("pgx", connStr)
+	db, err := sql.Open("pgx", cfg.Postgresql.DSN())
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
