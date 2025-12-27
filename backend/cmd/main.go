@@ -13,6 +13,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -33,7 +34,15 @@ func main() {
 	log := slogpretty.SetupLogger(cfg.Env)
 	log.Info("starting server", slog.String("env", cfg.Env))
 
-	connStr := "user=user password=password dbname=mydatabase sslmode=disable host=localhost port=5432"
+	connStr := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s host=%s port=%d",
+		cfg.Postgresql.User,
+		cfg.Postgresql.Password,
+		cfg.Postgresql.DBname,
+		cfg.Postgresql.SSLmode,
+		cfg.Postgresql.Host,
+		cfg.Postgresql.Port,
+	)
+	
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
@@ -67,7 +76,7 @@ func main() {
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	g.Go(func() error{
+	g.Go(func() error {
 		log.Info("starting Kafka consumer...")
 		return kafkaConsumer.Start(ctx, orderUseCase.HandleMessage)
 	})

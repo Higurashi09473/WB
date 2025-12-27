@@ -13,6 +13,7 @@ type Config struct {
 	StoragePath    string `yaml:"storage_path" env-required:"true"`
 	MigrationsPath string `yaml:"migrations_path"`
 	HTTPServer     `yaml:"http_server"`
+	Postgresql     `yaml:"postgresql"`
 	Redis          `yaml:"redis"`
 	Kafka          `yaml:"kafka"`
 }
@@ -34,6 +35,15 @@ type Kafka struct {
 	Brokers       []string `yaml:"brokers"`
 	ConsumerGroup string   `yaml:"consumer_group"`
 	Topic         string   `yaml:"topic"`
+}
+
+type Postgresql struct {
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	DBname   string `yaml:"dbname"`
+	SSLmode  string `yaml:"sslmode" env-default:"disable"`
+	Host     string `yaml:"host" env-default:"localhost"`
+	Port     int    `yaml:"port" env-default:"5432"`
 }
 
 func MustLoad() *Config {

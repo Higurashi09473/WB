@@ -5,6 +5,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
+
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 )
@@ -15,6 +17,14 @@ type Storage struct {
 
 func New(db *sql.DB, migrationsPath string) (*Storage, error) {
 	const op = "storage.postgres.New"
+
+	db.SetMaxIdleConns(20)
+	db.SetConnMaxLifetime(time.Hour)
+	db.SetConnMaxIdleTime(15 * time.Minute)
+
+	if err := db.Ping(); err != nil {
+        return nil, fmt.Errorf("%s: db ping failed: %w", op, err)
+    }
 
 	goose.SetDialect("postgres")
 

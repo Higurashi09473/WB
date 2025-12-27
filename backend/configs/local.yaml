@@ -7,6 +7,14 @@ http_server:
   timeout: 4s
   idle_timeout: 60s
 
+postgresql:
+  user: user
+  password: password
+  dbname: mydatabase
+  sslmode: disable 
+  host: localhost
+  port: 5432
+
 kafka:
   brokers: ["localhost:9092"]
   consumer_group: orders-group
