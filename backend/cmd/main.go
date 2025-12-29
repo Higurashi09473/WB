@@ -20,9 +20,11 @@ import (
 	"syscall"
 	"time"
 
+	chiprom "github.com/766b/chi-prometheus" // или "github.com/yarlson/chiprom"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -76,10 +78,13 @@ func main() {
 	router.Use(middleware.Logger)
 	router.Use(mwLogger.New(log))
 	router.Use(middleware.Recoverer)
+	
+	// позже нужно добавить метрики
+	router.Use(chiprom.NewMiddleware("my-service"))
 	// router.Use(middleware.URLFormat)
 
 	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:*"},
+		AllowedOrigins:   []string{"http://localhost:5173", "http://0.0.0.0:*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -87,6 +92,7 @@ func main() {
 		MaxAge:           300,
 	}))
 
+	router.Handle("/metrics", promhttp.Handler())
 	router.Post("/api/create_order", handlers.NewOrder(log, orderUseCase))
 	router.Get("/api/orders/{id}", handlers.GetOrder(log, orderUseCase))
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {

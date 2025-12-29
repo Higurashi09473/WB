@@ -1,2 +1,5 @@
 deployments/docker/*
 
+backend/docker/grafana-data/*
+backend/docker/prometheus-data/*
+backend/docker/redis-data/*
