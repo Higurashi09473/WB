@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	kafka "WB/internal/lib/kafka"
 	"WB/internal/lib/validator"
 	"WB/internal/models"
 )
@@ -22,17 +21,22 @@ type CacheRepository interface {
 	DeleteOrder(ctx context.Context, orderUID string) error
 }
 
+type MessageBroker interface {
+	Send(ctx context.Context, key string, value []byte) error
+	Close() error
+}
+
 type OrderUseCase struct {
 	orderRepo     OrderRepository
 	cacheRepo     CacheRepository
-	kafkaProducer *kafka.Producer
+	messageBroker MessageBroker
 }
 
-func NewOrderUseCase(orderRepo OrderRepository, cacheRepo CacheRepository, kafkaProducer *kafka.Producer) *OrderUseCase {
+func NewOrderUseCase(orderRepo OrderRepository, cacheRepo CacheRepository, messageBroker MessageBroker) *OrderUseCase {
 	return &OrderUseCase{
 		orderRepo:     orderRepo,
 		cacheRepo:     cacheRepo,
-		kafkaProducer: kafkaProducer,
+		messageBroker: messageBroker,
 	}
 }
 
@@ -48,7 +52,7 @@ func (uc *OrderUseCase) CreateOrder(ctx context.Context, order models.Order) err
 		return fmt.Errorf("%s: json marshal err: %w", op, err)
 	}
 
-	if err := uc.kafkaProducer.Send(ctx, order.OrderUID, orderJSON); err != nil {
+	if err := uc.messageBroker.Send(ctx, order.OrderUID, orderJSON); err != nil {
 		return fmt.Errorf("%s: kafka producer send err: %w", op, err)
 	}
 
@@ -85,15 +89,15 @@ func (uc *OrderUseCase) HandleMessage(ctx context.Context, key string, value []b
 
 	var order models.Order
 	if err := json.Unmarshal(value, &order); err != nil {
-		return fmt.Errorf("%s: JSON unmarshal err: %w", op, err) 
+		return fmt.Errorf("%s: JSON unmarshal err: %w", op, err)
 	}
-	
+
 	if _, err := uc.orderRepo.GetOrder(order.OrderUID); err == nil {
 		return nil
 	}
 
 	if err := uc.orderRepo.NewOrder(order); err != nil {
-		return fmt.Errorf("%s: orderRepo new order: %w", op, err) 
+		return fmt.Errorf("%s: orderRepo new order: %w", op, err)
 	}
 
 	orderJSON, marshalErr := json.Marshal(order)
