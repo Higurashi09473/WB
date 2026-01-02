@@ -3,7 +3,8 @@ package kafka
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -13,7 +14,7 @@ type Producer struct {
 	writer *kafka.Writer
 }
 
-func MustProducer(brokers []string, topic string) *Producer {
+func MustProducer(log *slog.Logger, brokers []string, topic string) *Producer {
 	const op = "kafka.produser.MustProducer"
 
 	writer := &kafka.Writer{
@@ -30,7 +31,11 @@ func MustProducer(brokers []string, topic string) *Producer {
 
 	conn, err := kafka.DialContext(ctx, "tcp", brokers[0])
 	if err != nil {
-		log.Fatalf("%s: failed to dial kafka broker %s: %v", op, brokers[0], err)
+		log.Error("failed to dial kafka broker", 
+            slog.String("op", op),
+            slog.String("broker", brokers[0]),
+            slog.Any("err", err))
+		os.Exit(1)
 	}
 	defer conn.Close()
 

@@ -36,7 +36,8 @@ cd backend
 docker compose up -d
 ```
 
-2. Запуск сервиса
+2. Запуск сервиса (по умолчанию включен local logger, для error логов поменяйте значение в конфиге)
+
 ```
 go run ./cmd/main.go
 ```
