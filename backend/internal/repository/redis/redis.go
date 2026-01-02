@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -13,8 +14,8 @@ type Redis struct {
 	Client *redis.Client
 }
 
-func New(host, port, password string, DB int) (*Redis, error) {
-	const op = "storage.redis.New"
+func MustLoad(host, port, password string, DB int) *Redis {
+	const op = "storage.redis.MustLoad"
 
 	client := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", host, port),
@@ -24,10 +25,10 @@ func New(host, port, password string, DB int) (*Redis, error) {
 
 	if err := client.Ping(context.Background()).Err(); err != nil {
 		client.Close()
-		return nil, fmt.Errorf("%s: ping failed: %w", op, err)
+		log.Fatalf("%s: apply migrations: %v", op, err)
 	}
 
-	return &Redis{Client: client}, nil
+	return &Redis{Client: client}
 }
 
 func (r *Redis) Close() error {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -15,24 +16,24 @@ type Storage struct {
 	db *sql.DB
 }
 
-func New(db *sql.DB, migrationsPath string) (*Storage, error) {
-	const op = "storage.postgres.New"
+func MustLoad(db *sql.DB, migrationsPath string) *Storage {
+	const op = "storage.postgres.MustLoad"
 
 	db.SetMaxIdleConns(20)
 	db.SetConnMaxLifetime(time.Hour)
 	db.SetConnMaxIdleTime(15 * time.Minute)
 
 	if err := db.Ping(); err != nil {
-        return nil, fmt.Errorf("%s: db ping failed: %w", op, err)
+		log.Fatalf("%s: db ping failed: %v", op, err)
     }
 
 	goose.SetDialect("postgres")
 
 	if err := goose.Up(db, migrationsPath); err != nil {
-		return nil, fmt.Errorf("%s: apply migrations: %w", op, err)
+		log.Fatalf("%s: apply migrations: %v", op, err)
 	}
 
-	return &Storage{db: db}, nil
+	return &Storage{db: db}
 }
 
 func (s *Storage) Close() error {

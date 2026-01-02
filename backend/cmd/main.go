@@ -40,23 +40,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	orderRepo, err := postgres.New(db, cfg.MigrationsPath)
-	if err != nil {
-		log.Error("failed to init storage", sl.Err(err))
-		os.Exit(1)
-	}
+	orderRepo := postgres.MustLoad(db, cfg.MigrationsPath)
 
-	redisConn, err := redis.New(cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.Password, cfg.Redis.DB)
-	if err != nil {
-		log.Error("failed to init redis", sl.Err(err))
-		os.Exit(1)
-	}
+	redisConn := redis.MustLoad(cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.Password, cfg.Redis.DB)
 
-	kafkaProducer, err := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topic)
-	if err != nil {
-		log.Error("failed to initialize Kafka producer:", sl.Err(err))
-		os.Exit(1)
-	}
+	kafkaProducer := kafka.MustProducer(cfg.Kafka.Brokers, cfg.Kafka.Topic)
 
 	orderUseCase := usecase.NewOrderUseCase(orderRepo, redisConn, kafkaProducer)
 
