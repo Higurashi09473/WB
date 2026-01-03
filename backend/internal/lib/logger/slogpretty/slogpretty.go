@@ -1,3 +1,5 @@
+// Package slogpretty provides a pretty-printing handler for slog.Logger.
+// It is used in local/development environments for human-readable colored logs.
 package slogpretty
 
 import (
@@ -18,10 +20,12 @@ const (
 	envProd  = "prod"
 )
 
+// PrettyHandlerOptions contains options for PrettyHandler.
 type PrettyHandlerOptions struct {
 	SlogOpts *slog.HandlerOptions
 }
 
+// PrettyHandler is a slog.Handler that prints colored, human-readable logs.
 type PrettyHandler struct {
 	// opts PrettyHandlerOptions
 	slog.Handler
@@ -29,6 +33,8 @@ type PrettyHandler struct {
 	attrs []slog.Attr
 }
 
+// NewPrettyHandler creates a new PrettyHandler instance.
+// It wraps a JSON handler (for structured logging) but prints in pretty format.
 func (opts *PrettyHandlerOptions) NewPrettyHandler(
 	out io.Writer,
 ) *PrettyHandler {
@@ -40,6 +46,7 @@ func (opts *PrettyHandlerOptions) NewPrettyHandler(
 	return h
 }
 
+// Handle formats and prints a log record in pretty colored format.
 func (h *PrettyHandler) Handle(_ context.Context, r slog.Record) error {
 	level := r.Level.String() + ":"
 
@@ -89,6 +96,7 @@ func (h *PrettyHandler) Handle(_ context.Context, r slog.Record) error {
 	return nil
 }
 
+// WithAttrs returns a new handler with additional attributes.
 func (h *PrettyHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return &PrettyHandler{
 		Handler: h.Handler,
@@ -97,6 +105,8 @@ func (h *PrettyHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	}
 }
 
+// WithGroup returns a new handler with a group prefix.
+// Currently not fully implemented — groups are passed to the inner JSON handler.
 func (h *PrettyHandler) WithGroup(name string) slog.Handler {
 	// TODO: implement
 	return &PrettyHandler{
@@ -105,6 +115,7 @@ func (h *PrettyHandler) WithGroup(name string) slog.Handler {
 	}
 }
 
+// SetupLogger configures and returns a slog.Logger based on the environment.
 func SetupLogger(env string) *slog.Logger {
 	var log *slog.Logger
 
@@ -124,6 +135,7 @@ func SetupLogger(env string) *slog.Logger {
 	return log
 }
 
+// setupPrettySlog creates a logger with pretty handler for local development.
 func setupPrettySlog() *slog.Logger {
 	opts := PrettyHandlerOptions{
 		SlogOpts: &slog.HandlerOptions{
