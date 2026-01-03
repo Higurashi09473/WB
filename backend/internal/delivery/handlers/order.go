@@ -1,3 +1,5 @@
+// Package handlers contains HTTP handlers for the WB backend API.
+// It uses chi router and provides endpoints for order operations.
 package handlers
 
 import (
@@ -13,6 +15,8 @@ import (
 	"github.com/go-chi/render"
 )
 
+// NewOrder returns HTTP handler for creating a new order.
+// It decodes JSON request body, validates it via use case and returns appropriate response.
 func NewOrder(log *slog.Logger, orderUseCase *usecase.OrderUseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.order.NewOrder"
@@ -43,6 +47,8 @@ func NewOrder(log *slog.Logger, orderUseCase *usecase.OrderUseCase) http.Handler
 	}
 }
 
+// GetOrder returns HTTP handler for retrieving an order by ID.
+// It extracts order ID from URL parameters and returns the order or error.
 func GetOrder(log *slog.Logger, orderUseCase *usecase.OrderUseCase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.order.GetOrder"

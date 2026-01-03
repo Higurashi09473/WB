@@ -1,3 +1,5 @@
+// Package usecase implements business logic for order operations.
+// It orchestrates interactions between repository, cache and message broker.
 package usecase
 
 import (
@@ -10,28 +12,33 @@ import (
 	"WB/internal/models"
 )
 
+// OrderRepository defines methods for persistent order storage.
 type OrderRepository interface {
 	NewOrder(order models.Order) error
 	GetOrder(orderID string) (models.Order, error)
 }
 
+// CacheRepository defines methods for caching orders (e.g., Redis).
 type CacheRepository interface {
 	GetOrder(ctx context.Context, orderUID string) ([]byte, error)
 	SetOrder(ctx context.Context, orderUID string, data []byte, ttl time.Duration) error
 	DeleteOrder(ctx context.Context, orderUID string) error
 }
 
+// MessageBroker defines methods for sending messages to Kafka.
 type MessageBroker interface {
 	Send(ctx context.Context, key string, value []byte) error
 	Close() error
 }
 
+// OrderUseCase contains dependencies and implements order-related use cases.
 type OrderUseCase struct {
 	orderRepo     OrderRepository
 	cacheRepo     CacheRepository
 	messageBroker MessageBroker
 }
 
+// NewOrderUseCase creates a new instance of OrderUseCase with required dependencies.
 func NewOrderUseCase(orderRepo OrderRepository, cacheRepo CacheRepository, messageBroker MessageBroker) *OrderUseCase {
 	return &OrderUseCase{
 		orderRepo:     orderRepo,
@@ -40,6 +47,8 @@ func NewOrderUseCase(orderRepo OrderRepository, cacheRepo CacheRepository, messa
 	}
 }
 
+// CreateOrder validates the order and sends it to Kafka for asynchronous processing.
+// It does not wait for persistence — that's handled by the consumer.
 func (uc *OrderUseCase) CreateOrder(ctx context.Context, order models.Order) error {
 	const op = "usecase.CreateOrder"
 
@@ -59,6 +68,8 @@ func (uc *OrderUseCase) CreateOrder(ctx context.Context, order models.Order) err
 	return nil
 }
 
+// GetOrder retrieves an order by UID, first checking cache, then database.
+// On successful DB fetch, it updates the cache.
 func (uc *OrderUseCase) GetOrder(ctx context.Context, orderUID string) (models.Order, error) {
 	const op = "usecase.GetOrder"
 
@@ -84,6 +95,9 @@ func (uc *OrderUseCase) GetOrder(ctx context.Context, orderUID string) (models.O
 	return order, nil
 }
 
+// HandleMessage processes incoming Kafka message with order data.
+// It saves the order to DB if not exists and updates cache.
+// Used by Kafka consumer.
 func (uc *OrderUseCase) HandleMessage(ctx context.Context, key string, value []byte) error {
 	const op = "usecase.HandleMessage"
 

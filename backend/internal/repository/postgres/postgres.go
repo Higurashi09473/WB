@@ -1,3 +1,5 @@
+// Package postgres contains for the WB backend.
+//
 package postgres
 
 import (
@@ -17,6 +19,8 @@ type Storage struct {
 	db *sql.DB
 }
 
+// MustLoad initializes PostgreSQL storage with database connection and runs migrations.
+// It panics on failure during migration — suitable for application startup.
 func MustLoad(log *slog.Logger, db *sql.DB, migrationsPath string) *Storage {
 	const op = "storage.postgres.MustLoad"
 
@@ -25,24 +29,40 @@ func MustLoad(log *slog.Logger, db *sql.DB, migrationsPath string) *Storage {
 	db.SetConnMaxIdleTime(15 * time.Minute)
 
 	if err := db.Ping(); err != nil {
-		log.Error("%s: db ping failed: %v", op, err)
+		log.Error("%s: db ping failed", op, slog.String("error", err.Error()))
 		os.Exit(1)
     }
 
-	goose.SetDialect("postgres")
-
-	if err := goose.Up(db, migrationsPath); err != nil {
-		log.Error("%s: db ping failed: %v", op, err)
-		os.Exit(1)
+	 if err := runMigrations(db, migrationsPath); err != nil {
+		log.Error("%s: failed to apply database migrations", op, slog.String("error", err.Error()))
+		os.Exit(1) 
 	}
 
 	return &Storage{db: db}
 }
 
-func (s *Storage) Close() error {
-	return s.db.Close()
+// runMigrations applies pending migrations using goose.
+func runMigrations(db *sql.DB, migrationsPath string) error {
+	if migrationsPath == "" {
+		return fmt.Errorf("migrations path is empty")
+	}
+
+	goose.SetLogger(goose.NopLogger()) // goose очень болтливый по умолчанию
+
+	if err := goose.SetDialect("pgx"); err != nil {
+		return fmt.Errorf("failed to set goose dialect: %w", err)
+	}
+
+	if err := goose.Up(db, migrationsPath); err != nil {
+		return fmt.Errorf("failed to apply migrations: %w", err)
+	}
+
+	return nil
 }
 
+
+
+// NewOrder adds a new order to the database or returns an error.
 func (s *Storage) NewOrder(order models.Order) (error){
 	const op = "storage.postgres.NewOrder"
 
@@ -108,7 +128,7 @@ func (s *Storage) NewOrder(order models.Order) (error){
     return nil
 }
 
-
+// GetOrder retrieves an order by its ID from the database.
 func (s *Storage) GetOrder(orderId string) (models.Order, error){
 	const op = "storage.postgres.GetOrder"
 
@@ -170,4 +190,10 @@ func (s *Storage) GetOrder(orderId string) (models.Order, error){
 	}
 
 	return order, nil
+}
+
+// Close closes the underlying database connection.
+// Should be called on application shutdown.
+func (s *Storage) Close() error {
+	return s.db.Close()
 }

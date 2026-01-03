@@ -23,13 +23,13 @@ type PrettyHandlerOptions struct {
 }
 
 type PrettyHandler struct {
-	opts PrettyHandlerOptions
+	// opts PrettyHandlerOptions
 	slog.Handler
 	l     *stdLog.Logger
 	attrs []slog.Attr
 }
 
-func (opts PrettyHandlerOptions) NewPrettyHandler(
+func (opts *PrettyHandlerOptions) NewPrettyHandler(
 	out io.Writer,
 ) *PrettyHandler {
 	h := &PrettyHandler{
@@ -76,7 +76,7 @@ func (h *PrettyHandler) Handle(_ context.Context, r slog.Record) error {
 		}
 	}
 
-	timeStr := r.Time.Format("[15:05:05.000]")
+	timeStr := r.Time.Format("[15:04:05.000]")
 	msg := color.CyanString(r.Message)
 
 	h.l.Println(

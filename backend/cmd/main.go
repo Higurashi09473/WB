@@ -1,3 +1,6 @@
+// Package main contains the entry point for the WB backend service
+// It initializes configuration, connects to databases, starts Kafka consumers/producers
+// and launches the HTTP server.
 package main
 
 import (
@@ -34,7 +37,7 @@ func main() {
 	log := slogpretty.SetupLogger(cfg.Env)
 	log.Info("starting server", slog.String("env", cfg.Env))
 
-	db, err := sql.Open("pgx", cfg.Postgresql.DSN())
+	db, err := sql.Open("pgx", cfg.DSN())
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
@@ -42,13 +45,13 @@ func main() {
 
 	orderRepo := postgres.MustLoad(log, db, cfg.MigrationsPath)
 
-	redisConn := redis.MustLoad(log, cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.Password, cfg.Redis.DB)
+	redisConn := redis.MustLoad(log, cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.Password, cfg.DB)
 
-	kafkaProducer := kafka.MustProducer(log, cfg.Kafka.Brokers, cfg.Kafka.Topic)
+	kafkaProducer := kafka.MustProducer(log, cfg.Brokers, cfg.Topic)
 
 	orderUseCase := usecase.NewOrderUseCase(orderRepo, redisConn, kafkaProducer)
 
-	kafkaConsumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.ConsumerGroup, cfg.Kafka.Topic, cfg.Kafka.DLQTopic)
+	kafkaConsumer := kafka.NewConsumer(cfg.Brokers, cfg.ConsumerGroup, cfg.Topic, cfg.DLQTopic)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -66,7 +69,7 @@ func main() {
 	router.Use(middleware.Logger)
 	router.Use(mwLogger.New(log))
 	router.Use(middleware.Recoverer)
-	
+
 	// позже нужно добавить метрики
 	router.Use(chiprom.NewMiddleware("my-service"))
 	// router.Use(middleware.URLFormat)
@@ -90,9 +93,9 @@ func main() {
 	srv := &http.Server{
 		Addr:         cfg.Address,
 		Handler:      router,
-		ReadTimeout:  cfg.HTTPServer.Timeout,
-		WriteTimeout: cfg.HTTPServer.Timeout,
-		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
+		ReadTimeout:  cfg.Timeout,
+		WriteTimeout: cfg.Timeout,
+		IdleTimeout:  cfg.IdleTimeout,
 	}
 
 	g.Go(func() error {
