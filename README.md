@@ -124,6 +124,13 @@ URL: http://localhost:8888/
 make run
 ```
 
+# Запустить linter
+```
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2
+
+make lint
+```
+
 # Запустить Docker Compose
 ```
 make docker-up
@@ -138,54 +145,57 @@ make docker-down
 
 ```plaintext
 WB
-├── cmd
-│   └── main.go
-├── configs
-│   └── local.yaml
-├── docker
-│   ├── docker-compose.yml
-│   ├── kafka-data
-│   ├── postgres-data
-│   └── redis-data
-├── go.mod
-├── go.sum
-├── internal
-│   ├── config
-│   │   └── config.go
-│   ├── delivery
-│   │   ├── handlers
-│   │   │   └── order.go
-│   │   └── middleware
-│   │       └── logger
-│   │           └── logger.go
-│   ├── lib
-│   │   ├── api
-│   │   │   └── response
-│   │   │       └── response.go
-│   │   ├── kafka
-│   │   │   ├── consumer.go
-│   │   │   └── produser.go
-│   │   ├── logger
-│   │   │   ├── sl
-│   │   │   │   └── sl.go
-│   │   │   └── slogpretty
-│   │   │       └── slogpretty.go
-│   │   └── validator
-│   │       └── validator.go
-│   ├── models
-│   │   └── models.go
-│   ├── repository
-│   │   ├── postgres
-│   │   │   └── postgres.go
-│   │   └── redis
-│   │       └── redis.go
-│   └── usecase
-│       └── usecase.go
-├── migrations
-│   └── 20250828155143_create_initial_tables.sql
-└── web
-    └── static
-        └── index.html
+├── backend
+│   ├── cmd
+│   │   └── main.go
+│   ├── configs
+│   │   └── local.yaml
+│   ├── docker
+│   │   ├── docker-compose.yml
+│   ├── go.mod
+│   ├── go.sum
+│   ├── internal
+│   │   ├── config
+│   │   │   └── config.go
+│   │   ├── delivery
+│   │   │   ├── handlers
+│   │   │   │   └── order.go
+│   │   │   └── middleware
+│   │   │       └── logger
+│   │   │           └── logger.go
+│   │   ├── lib
+│   │   │   ├── api
+│   │   │   │   └── response
+│   │   │   │       └── response.go
+│   │   │   ├── kafka
+│   │   │   │   ├── consumer.go
+│   │   │   │   ├── dlq.go
+│   │   │   │   └── producer.go
+│   │   │   ├── logger
+│   │   │   │   ├── sl
+│   │   │   │   │   └── sl.go
+│   │   │   │   └── slogpretty
+│   │   │   │       └── slogpretty.go
+│   │   │   └── validator
+│   │   │       └── validator.go
+│   │   ├── models
+│   │   │   └── models.go
+│   │   ├── repository
+│   │   │   ├── postgres
+│   │   │   │   └── postgres.go
+│   │   │   └── redis
+│   │   │       └── redis.go
+│   │   └── usecase
+│   │       ├── usecase.go
+│   │       └── usecase_test.go
+│   ├── Makefile
+│   ├── migrations
+│   │   └── 20250828155143_create_initial_tables.sql
+│   ├── web
+│   │   └── static
+│   │       └── index.html
+│   └── .golangci.yml
+├── README.md
+└── .gitignore
 
-32 directories, 21 files
 ```
