@@ -21,6 +21,7 @@ type dlqMessage struct {
 	Headers           map[string]string `json:"headers,omitempty"`
 }
 
+// sendToDLQ sends the original message to the dead letter queue with error context.
 func (c *Consumer) sendToDLQ(ctx context.Context, msg kafka.Message, procErr error) error {
 	const op = "kafka.dlq.sendToDLQ"
 

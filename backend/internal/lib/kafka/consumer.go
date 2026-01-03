@@ -1,3 +1,5 @@
+// Package kafka provides Kafka producer and consumer implementations
+// for the message broker interface used in the WB backend
 package kafka
 
 import (
@@ -8,12 +10,18 @@ import (
 
 	"github.com/segmentio/kafka-go"
 )
-
+// Consumer represents Message broker consumer.
 type Consumer struct {
 	reader    *kafka.Reader
 	dlqWriter *kafka.Writer
 }
 
+// MessageHandler is a function type for processing incoming Kafka messages.
+type MessageHandler func(ctx context.Context, value []byte) error
+
+
+// NewConsumer creates and configures a new Kafka consumer with DLQ writer.
+// It connects to the specified brokers, joins the consumer group and subscribes to the topic.
 func NewConsumer(brokers []string, group, topic, dlqTopic string) *Consumer {
 	return &Consumer{
 		reader: kafka.NewReader(kafka.ReaderConfig{
@@ -34,8 +42,10 @@ func NewConsumer(brokers []string, group, topic, dlqTopic string) *Consumer {
 	}
 }
 
-type MessageHandler func(ctx context.Context, value []byte) error
-
+// Start begins consuming messages from Kafka and processes them using the provided handler.
+// It runs until the context is canceled or a fatal error occurs.
+// On handler error — message is skipped (not committed), but consumption continues.
+// On commit error — message is sent to DLQ if possible.
 func (c *Consumer) Start(ctx context.Context, handler MessageHandler) error {
     const op = "kafka.consumer.Start"
 
@@ -53,13 +63,13 @@ func (c *Consumer) Start(ctx context.Context, handler MessageHandler) error {
 		}
 
 		if err := c.reader.CommitMessages(ctx, msg); err != nil {
-			if err := c.sendToDLQ(ctx, msg, err); err != nil {
-				continue
-			}
+			_ = c.sendToDLQ(ctx, msg, err)
 		}
 	}
 }
 
+// Close gracefully shuts down the consumer and DLQ writer.
+// It closes both connections and collects any errors.
 func (c *Consumer) Close() error {
     const op = "kafka.consumer.Close"
 

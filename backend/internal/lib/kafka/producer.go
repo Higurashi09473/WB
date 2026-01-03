@@ -1,3 +1,5 @@
+// Package kafka provides Kafka producer and consumer implementations
+// for the message broker interface used in the WB backend
 package kafka
 
 import (
@@ -10,10 +12,13 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
+// Producer represents Message broker producer.
 type Producer struct {
 	writer *kafka.Writer
 }
 
+// MustProducer initializes Message broker producer.
+// If a failure occurs during migration, os.exit is executed
 func MustProducer(log *slog.Logger, brokers []string, topic string) *Producer {
 	const op = "kafka.produser.MustProducer"
 
@@ -49,6 +54,7 @@ func MustProducer(log *slog.Logger, brokers []string, topic string) *Producer {
 	return &Producer{writer: writer}
 }
 
+// Send writes a batch of messages to the kafka topic configured on this writer.
 func (p *Producer) Send(ctx context.Context, key string, value []byte) error {
 	const op = "kafka.produser.Send"
 
@@ -62,6 +68,8 @@ func (p *Producer) Send(ctx context.Context, key string, value []byte) error {
 	return nil
 }
 
+// Close flushes pending writes, and waits for all writes to complete before returning
+// Should be called on application shutdown.
 func (p *Producer) Close() error {
 	return p.writer.Close()
 }
