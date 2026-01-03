@@ -1,5 +1,5 @@
-// Package postgres contains for the WB backend.
-//
+// Package postgres provides PostgreSQL-based implementation of order storage.
+// It handles database connection, migrations and order CRUD operations.
 package postgres
 
 import (
@@ -11,16 +11,17 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib" //import pgx driver
 	"github.com/pressly/goose/v3"
 )
 
+// Storage represents PostgreSQL repository for orders.
 type Storage struct {
 	db *sql.DB
 }
 
 // MustLoad initializes PostgreSQL storage with database connection and runs migrations.
-// It panics on failure during migration — suitable for application startup.
+// If a failure occurs during migration, os.exit is executed
 func MustLoad(log *slog.Logger, db *sql.DB, migrationsPath string) *Storage {
 	const op = "storage.postgres.MustLoad"
 
@@ -31,11 +32,11 @@ func MustLoad(log *slog.Logger, db *sql.DB, migrationsPath string) *Storage {
 	if err := db.Ping(); err != nil {
 		log.Error("%s: db ping failed", op, slog.String("error", err.Error()))
 		os.Exit(1)
-    }
+	}
 
-	 if err := runMigrations(db, migrationsPath); err != nil {
+	if err := runMigrations(db, migrationsPath); err != nil {
 		log.Error("%s: failed to apply database migrations", op, slog.String("error", err.Error()))
-		os.Exit(1) 
+		os.Exit(1)
 	}
 
 	return &Storage{db: db}
@@ -60,76 +61,74 @@ func runMigrations(db *sql.DB, migrationsPath string) error {
 	return nil
 }
 
-
-
 // NewOrder adds a new order to the database or returns an error.
-func (s *Storage) NewOrder(order models.Order) (error){
+func (s *Storage) NewOrder(order models.Order) error {
 	const op = "storage.postgres.NewOrder"
 
 	tx, err := s.db.BeginTx(context.Background(), nil)
-    if err != nil {
-        return fmt.Errorf("%s: begin transaction: %w", op, err)
-    }
-    defer tx.Rollback()
+	if err != nil {
+		return fmt.Errorf("%s: begin transaction: %w", op, err)
+	}
+	defer tx.Rollback()
 
-    // 1. Delivery
-    _, err = tx.Exec(`
+	// 1. Delivery
+	_, err = tx.Exec(`
         INSERT INTO delivery (order_uid, name, phone, zip, city, address, region, email)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (order_uid) DO NOTHING`,
-        order.OrderUID, order.Delivery.Name, order.Delivery.Phone, order.Delivery.Zip,
-        order.Delivery.City, order.Delivery.Address, order.Delivery.Region, order.Delivery.Email)
-    if err != nil {
-        return fmt.Errorf("%s: insert delivery: %w", op, err)
-    }
+		order.OrderUID, order.Delivery.Name, order.Delivery.Phone, order.Delivery.Zip,
+		order.Delivery.City, order.Delivery.Address, order.Delivery.Region, order.Delivery.Email)
+	if err != nil {
+		return fmt.Errorf("%s: insert delivery: %w", op, err)
+	}
 
-    // 2. Payment
-    _, err = tx.Exec(`
+	// 2. Payment
+	_, err = tx.Exec(`
         INSERT INTO payment (transaction, request_id, currency, provider, amount, payment_dt, bank, delivery_cost, goods_total, custom_fee)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (transaction) DO NOTHING`,
-        order.Payment.Transaction, order.Payment.RequestID, order.Payment.Currency, order.Payment.Provider,
-        order.Payment.Amount, order.Payment.PaymentDt, order.Payment.Bank, order.Payment.DeliveryCost,
-        order.Payment.GoodsTotal, order.Payment.CustomFee)
-    if err != nil {
-        return fmt.Errorf("%s: insert payment: %w", op, err)
-    }
+		order.Payment.Transaction, order.Payment.RequestID, order.Payment.Currency, order.Payment.Provider,
+		order.Payment.Amount, order.Payment.PaymentDt, order.Payment.Bank, order.Payment.DeliveryCost,
+		order.Payment.GoodsTotal, order.Payment.CustomFee)
+	if err != nil {
+		return fmt.Errorf("%s: insert payment: %w", op, err)
+	}
 
-    // 3. Orders
-    _, err = tx.Exec(`
+	// 3. Orders
+	_, err = tx.Exec(`
         INSERT INTO orders (order_uid, track_number, entry, delivery_uid, payment_transaction, locale, internal_signature, customer_id, delivery_service, shardkey, sm_id, date_created, oof_shard)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         ON CONFLICT (order_uid) DO NOTHING`,
 		order.OrderUID, order.TrackNumber, order.Entry, order.OrderUID, order.Payment.Transaction,
 		order.Locale, order.InternalSignature, order.CustomerID, order.DeliveryService,
 		order.Shardkey, order.SmID, order.DateCreated, order.OofShard)
-    if err != nil {
-        return fmt.Errorf("%s: insert orders: %w", op, err)
-    }
+	if err != nil {
+		return fmt.Errorf("%s: insert orders: %w", op, err)
+	}
 
-    // 4. Items
-    for _, item := range order.Items {
-        _, err = tx.Exec(`
+	// 4. Items
+	for _, item := range order.Items {
+		_, err = tx.Exec(`
             INSERT INTO items (
                 order_uid, chrt_id, track_number, price, rid, name, sale,
                 size, total_price, nm_id, brand, status
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`, // уникальный ключ, предположительно
-            order.OrderUID, item.ChrtID, item.TrackNumber, item.Price, item.Rid,
-            item.Name, item.Sale, item.Size, item.TotalPrice, item.NmID, item.Brand, item.Status)
-        if err != nil {
-            return fmt.Errorf("%s: insert item %v: %w", op, item.ChrtID, err)
-        }
-    }
+			order.OrderUID, item.ChrtID, item.TrackNumber, item.Price, item.Rid,
+			item.Name, item.Sale, item.Size, item.TotalPrice, item.NmID, item.Brand, item.Status)
+		if err != nil {
+			return fmt.Errorf("%s: insert item %v: %w", op, item.ChrtID, err)
+		}
+	}
 
-    if err := tx.Commit(); err != nil {
-        return fmt.Errorf("%s: commit transaction: %w", op, err)
-    }
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("%s: commit transaction: %w", op, err)
+	}
 
-    return nil
+	return nil
 }
 
 // GetOrder retrieves an order by its ID from the database.
-func (s *Storage) GetOrder(orderId string) (models.Order, error){
+func (s *Storage) GetOrder(orderID string) (models.Order, error) {
 	const op = "storage.postgres.GetOrder"
 
 	// 1. Orders
@@ -137,7 +136,7 @@ func (s *Storage) GetOrder(orderId string) (models.Order, error){
 	err := s.db.QueryRow(`
 		SELECT order_uid, track_number, entry, payment_transaction, locale, internal_signature, customer_id, 
 				delivery_service, shardkey, sm_id, date_created, oof_shard
-		FROM orders WHERE order_uid = $1`, orderId).Scan(
+		FROM orders WHERE order_uid = $1`, orderID).Scan(
 		&order.OrderUID, &order.TrackNumber, &order.Entry, &order.Payment.Transaction, &order.Locale,
 		&order.InternalSignature, &order.CustomerID, &order.DeliveryService,
 		&order.Shardkey, &order.SmID, &order.DateCreated, &order.OofShard)
@@ -148,7 +147,7 @@ func (s *Storage) GetOrder(orderId string) (models.Order, error){
 	// 2. Delivery
 	err = s.db.QueryRow(`
 		SELECT name, phone, zip, city, address, region, email
-		FROM delivery WHERE order_uid = $1`, orderId).Scan(
+		FROM delivery WHERE order_uid = $1`, orderID).Scan(
 		&order.Delivery.Name, &order.Delivery.Phone, &order.Delivery.Zip,
 		&order.Delivery.City, &order.Delivery.Address, &order.Delivery.Region,
 		&order.Delivery.Email)
@@ -172,7 +171,7 @@ func (s *Storage) GetOrder(orderId string) (models.Order, error){
 	// 4. Items
 	rows, err := s.db.Query(`
 		SELECT chrt_id, track_number, price, rid, name, sale, size, total_price, nm_id, brand, status
-		FROM items WHERE order_uid = $1`, orderId)
+		FROM items WHERE order_uid = $1`, orderID)
 	if err != nil {
 		return models.Order{}, fmt.Errorf("%s: get items: %w", op, err)
 	}

@@ -1,3 +1,5 @@
+// Package redis provides Redis-based implementation of order storage.
+// It handles database connection and order CRUD operations.
 package redis
 
 import (
@@ -11,10 +13,12 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// Redis represents Redis repository for orders.
 type Redis struct {
 	Client *redis.Client
 }
 
+// MustLoad initializes Redis storage with database connection.
 func MustLoad(log *slog.Logger, host, port, password string, DB int) *Redis {
 	const op = "storage.redis.MustLoad"
 
@@ -33,10 +37,7 @@ func MustLoad(log *slog.Logger, host, port, password string, DB int) *Redis {
 	return &Redis{Client: client}
 }
 
-func (r *Redis) Close() error {
-	return r.Client.Close()
-}
-
+// GetOrder retrieves an order by its orderUID from the database.
 func (r *Redis) GetOrder(ctx context.Context, orderUID string) ([]byte, error) {
 	const op = "storage.redis.GetOrder"
 
@@ -53,6 +54,7 @@ func (r *Redis) GetOrder(ctx context.Context, orderUID string) ([]byte, error) {
 	return data, nil
 }
 
+// SetOrder adds a new order to the Redis or returns an error.
 func (r *Redis) SetOrder(ctx context.Context, orderUID string, data []byte, ttl time.Duration) error {
 	const op = "storage.redis.SetOrder"
 
@@ -66,6 +68,7 @@ func (r *Redis) SetOrder(ctx context.Context, orderUID string, data []byte, ttl 
 	return nil
 }
 
+// DeleteOrder deletes the order from Redis or returns an error.
 func (r *Redis) DeleteOrder(ctx context.Context, orderUID string) error {
 	const op = "storage.redis.DeleteOrder"
 
@@ -77,4 +80,10 @@ func (r *Redis) DeleteOrder(ctx context.Context, orderUID string) error {
 	}
 
 	return nil
+}
+
+// Close closes the underlying database connection.
+// Should be called on application shutdown.
+func (r *Redis) Close() error {
+	return r.Client.Close()
 }
