@@ -34,7 +34,7 @@ func NewConsumer(brokers []string, group, topic, dlqTopic string) *Consumer {
 	}
 }
 
-type MessageHandler func(ctx context.Context, key string, value []byte) error
+type MessageHandler func(ctx context.Context, value []byte) error
 
 func (c *Consumer) Start(ctx context.Context, handler MessageHandler) error {
     const op = "kafka.consumer.Start"
@@ -48,7 +48,7 @@ func (c *Consumer) Start(ctx context.Context, handler MessageHandler) error {
 			return fmt.Errorf("%s: fetch err: %w", op, err)
 		}
 
-		if err := handler(ctx, string(msg.Key), msg.Value); err != nil {
+		if err := handler(ctx, msg.Value); err != nil {
 			continue
 		}
 

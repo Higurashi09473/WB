@@ -98,26 +98,28 @@ func (uc *OrderUseCase) GetOrder(ctx context.Context, orderUID string) (models.O
 // HandleMessage processes incoming Kafka message with order data.
 // It saves the order to DB if not exists and updates cache.
 // Used by Kafka consumer.
-func (uc *OrderUseCase) HandleMessage(ctx context.Context, key string, value []byte) error {
+func (uc *OrderUseCase) HandleMessage(ctx context.Context, value []byte) error {
 	const op = "usecase.HandleMessage"
 
 	var order models.Order
 	if err := json.Unmarshal(value, &order); err != nil {
-		return fmt.Errorf("%s: JSON unmarshal err: %w", op, err)
+		return fmt.Errorf("%s: failed to unmarshal message: %w", op, err)
 	}
 
+	// Avoid duplicates
 	if _, err := uc.orderRepo.GetOrder(order.OrderUID); err == nil {
-		return nil
+		return nil // order already exists
 	}
 
 	if err := uc.orderRepo.NewOrder(order); err != nil {
-		return fmt.Errorf("%s: orderRepo new order: %w", op, err)
+		return fmt.Errorf("%s: failed to save order to repository: %w", op, err)
 	}
 
-	orderJSON, marshalErr := json.Marshal(order)
-	if marshalErr == nil {
+	// Update cache
+	if orderJSON, marshalErr := json.Marshal(order); marshalErr == nil {
 		uc.cacheRepo.SetOrder(ctx, order.OrderUID, orderJSON, 24*time.Hour)
 	}
 
 	return nil
 }
+
