@@ -279,7 +279,7 @@ func TestHandleMessage_NewOrder_Success(t *testing.T) {
 
 	uc := NewOrderUseCase(mockRepo, mockCache, mockProd)
 
-	err := uc.HandleMessage(ctx, "new-order-abc", data)
+	err := uc.HandleMessage(ctx, data)
 
 	assert.NoError(t, err)
 	mockRepo.AssertExpectations(t)
@@ -305,7 +305,7 @@ func TestHandleMessage_DuplicateOrder(t *testing.T) {
 
 	uc := NewOrderUseCase(mockRepo, mockCache, mockProd)
 
-	err := uc.HandleMessage(ctx, "already-exist", data)
+	err := uc.HandleMessage(ctx, data)
 
 	assert.NoError(t, err) // дубликат — нормальная ситуация
 	mockRepo.AssertNotCalled(t, "NewOrder")
