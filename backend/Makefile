@@ -6,8 +6,15 @@ run:
 lint: 
 	golangci-lint run ./internal/... ./cmd/...
 
+coverage:
+	go test ./internal/... ./cmd/... -coverprofile=cover.out
+
+test:
+	go test ./internal/... ./cmd/... -v
+
 cache-clear:
-	golangci-lint cache clear
+	golangci-lint cache clean
+	go clean -modcache
 
 docker-up:
 	docker compose -f $(DOCKER_COMPOSE_FILE) up -d
