@@ -1,6 +1,6 @@
 env: "local" #local, dev, prod
 storage_path: "./storage/storage.db"
-migrations_path: "./migrations"
+migrations_path: "./migration"
 
 http_server:
   address: "0.0.0.0:8888"
