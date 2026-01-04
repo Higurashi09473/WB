@@ -48,8 +48,6 @@ func runMigrations(db *sql.DB, migrationsPath string) error {
 		return fmt.Errorf("migrations path is empty")
 	}
 
-	goose.SetLogger(goose.NopLogger()) // goose очень болтливый по умолчанию
-
 	if err := goose.SetDialect("pgx"); err != nil {
 		return fmt.Errorf("failed to set goose dialect: %w", err)
 	}
