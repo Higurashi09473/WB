@@ -58,7 +58,7 @@ type Kafka struct {
 // MustLoad loads configuration from YAML file and environment variables.
 // It panics if the config file is missing or cannot be read.
 func MustLoad() *Config {
-	configPath := "./configs/local.yaml" //os.Getenv("CONFIG_PATH")
+	configPath := "./configs/local.yaml" 
 	if configPath == "" {
 		log.Fatal("CONFIG_PATH is not set")
 	}
