@@ -37,7 +37,7 @@ func NewOrder(log *slog.Logger, orderUseCase *usecase.OrderUseCase) http.Handler
 		}
 
 		if err := orderUseCase.CreateOrder(ctx, order); err != nil {
-			log.Error("failed to unmarshal order", "op", op, "error", err)
+			log.Error("failed create order", "op", op, "error", err)
 			render.JSON(w, r, resp.Error(err.Error()))
 			return
 		}

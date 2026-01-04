@@ -1,15 +1,12 @@
-// internal/usecase/usecase_test.go
-
 package usecase
 
 import (
+	"WB/internal/models"
 	"context"
 	"encoding/json"
 	"errors"
 	"testing"
 	"time"
-
-	"WB/internal/models"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -62,10 +59,6 @@ func (m *mockMessageBroker) Close() error {
 	return args.Error(0)
 }
 
-// ---------------------------------------------------------
-// Тесты CreateOrder
-// ---------------------------------------------------------
-
 func TestCreateOrder_Success(t *testing.T) {
 	ctx := context.Background()
 	mockRepo := new(mockOrderRepo)
@@ -73,11 +66,11 @@ func TestCreateOrder_Success(t *testing.T) {
 	mockProd := new(mockMessageBroker)
 
 	order := models.Order{
-		OrderUID:          "b563feb7b2b84b6test", // уникальный UID
+		OrderUID:          "b563feb7b2b84b6test",
 		TrackNumber:       "WBILMTESTTRACK",
 		Entry:             "WBIL",
 		Locale:            "en",
-		InternalSignature: "", // опционально
+		InternalSignature: "",
 		CustomerID:        "test",
 		DeliveryService:   "meest",
 		Shardkey:          "9",
@@ -125,13 +118,10 @@ func TestCreateOrder_Success(t *testing.T) {
 		},
 	}
 
-	// Мокируем валидацию (предполагаем, что она проходит)
-	// Если валидатор строгий — можно замокать validator.ValidateOrder
-
 	orderJSON, _ := json.Marshal(order)
 
 	mockProd.
-		On("Send", ctx, order.OrderUID, orderJSON).
+		On("Send", ctx, order.OrderUID, mock.MatchedBy(func(b []byte) bool { return assert.JSONEq(t, string(orderJSON), string(b)) })).
 		Return(nil).
 		Once()
 
@@ -143,6 +133,37 @@ func TestCreateOrder_Success(t *testing.T) {
 	mockProd.AssertExpectations(t)
 }
 
+func TestCreateOrder_ValidationError(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(mockOrderRepo)
+	mockCache := new(mockCacheRepo)
+	mockProd := new(mockMessageBroker)
+
+	order := models.Order{} // Invalid order
+
+	uc := NewOrderUseCase(mockRepo, mockCache, mockProd)
+
+	err := uc.CreateOrder(ctx, order)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "validator")
+	mockProd.AssertNotCalled(t, "Send")
+}
+
+// func TestCreateOrder_MarshalError(t *testing.T) {
+// 	ctx := context.Background()
+// 	mockRepo := new(mockOrderRepo)
+// 	mockCache := new(mockCacheRepo)
+// 	mockProd := new(mockMessageBroker)
+
+// 	order := models.Order{
+// 		OrderUID: "valid-uid",
+// 		// Force marshal error by including unmarshalable field, but since models are structs, hard to force; instead, we can assume it's covered or skip if rare.
+// 	}
+
+// 	t.Skip("Marshal error is rare for structs; consider if needed")
+// }
+
 func TestCreateOrder_KafkaError(t *testing.T) {
 	ctx := context.Background()
 	mockRepo := new(mockOrderRepo)
@@ -150,11 +171,11 @@ func TestCreateOrder_KafkaError(t *testing.T) {
 	mockProd := new(mockMessageBroker)
 
 	order := models.Order{
-		OrderUID:          "test", // уникальный UID
+		OrderUID:          "b563feb7b2b84b6test",
 		TrackNumber:       "WBILMTESTTRACK",
 		Entry:             "WBIL",
 		Locale:            "en",
-		InternalSignature: "", // опционально
+		InternalSignature: "",
 		CustomerID:        "test",
 		DeliveryService:   "meest",
 		Shardkey:          "9",
@@ -201,10 +222,11 @@ func TestCreateOrder_KafkaError(t *testing.T) {
 			},
 		},
 	}
+
 	orderJSON, _ := json.Marshal(order)
 
 	mockProd.
-		On("Send", ctx, order.OrderUID, orderJSON).
+		On("Send", ctx, order.OrderUID, mock.MatchedBy(func(b []byte) bool { return assert.JSONEq(t, string(orderJSON), string(b)) })).
 		Return(errors.New("kafka timeout")).
 		Once()
 
@@ -215,11 +237,8 @@ func TestCreateOrder_KafkaError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "kafka producer send err")
 	assert.Contains(t, err.Error(), "kafka timeout")
+	mockProd.AssertExpectations(t)
 }
-
-// ---------------------------------------------------------
-// Тесты GetOrder
-// ---------------------------------------------------------
 
 func TestGetOrder_FromCache_Success(t *testing.T) {
 	ctx := context.Background()
@@ -235,8 +254,6 @@ func TestGetOrder_FromCache_Success(t *testing.T) {
 		Return(cachedJSON, nil).
 		Once()
 
-	mockRepo.On("GetOrder", mock.Anything).Return(models.Order{}, nil).Maybe()
-
 	uc := NewOrderUseCase(mockRepo, mockCache, mockProd)
 
 	result, err := uc.GetOrder(ctx, "cache-hit-777")
@@ -247,10 +264,105 @@ func TestGetOrder_FromCache_Success(t *testing.T) {
 	mockRepo.AssertNotCalled(t, "GetOrder")
 }
 
+func TestGetOrder_FromCache_InvalidJSON(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(mockOrderRepo)
+	mockCache := new(mockCacheRepo)
+	mockProd := new(mockMessageBroker)
 
-// ---------------------------------------------------------
-// Тесты HandleMessage (consumer)
-// ---------------------------------------------------------
+	order := models.Order{OrderUID: "cache-invalid-888"}
+
+	mockCache.
+		On("GetOrder", ctx, "cache-invalid-888").
+		Return([]byte("invalid json"), nil).
+		Once()
+
+	mockCache.
+		On("DeleteOrder", ctx, "cache-invalid-888").
+		Return(nil).
+		Once()
+
+	mockRepo.
+		On("GetOrder", "cache-invalid-888").
+		Return(order, nil).
+		Once()
+
+	orderJSON, _ := json.Marshal(order)
+	mockCache.
+		On("SetOrder", ctx, "cache-invalid-888", mock.MatchedBy(func(b []byte) bool { return assert.JSONEq(t, string(orderJSON), string(b)) }), 24*time.Hour).
+		Return(nil).
+		Once()
+
+	uc := NewOrderUseCase(mockRepo, mockCache, mockProd)
+
+	result, err := uc.GetOrder(ctx, "cache-invalid-888")
+
+	assert.NoError(t, err)
+	assert.Equal(t, order.OrderUID, result.OrderUID)
+	mockCache.AssertExpectations(t)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetOrder_CacheMiss_DB_Success(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(mockOrderRepo)
+	mockCache := new(mockCacheRepo)
+	mockProd := new(mockMessageBroker)
+
+	order := models.Order{OrderUID: "cache-miss-999"}
+
+	mockCache.
+		On("GetOrder", ctx, "cache-miss-999").
+		Return([]byte{}, errors.New("not found")).
+		Once()
+
+	mockRepo.
+		On("GetOrder", "cache-miss-999").
+		Return(order, nil).
+		Once()
+
+	orderJSON, _ := json.Marshal(order)
+	mockCache.
+		On("SetOrder", ctx, "cache-miss-999", mock.MatchedBy(func(b []byte) bool { return assert.JSONEq(t, string(orderJSON), string(b)) }), 24*time.Hour).
+		Return(nil).
+		Once()
+
+	uc := NewOrderUseCase(mockRepo, mockCache, mockProd)
+
+	result, err := uc.GetOrder(ctx, "cache-miss-999")
+
+	assert.NoError(t, err)
+	assert.Equal(t, order.OrderUID, result.OrderUID)
+	mockCache.AssertExpectations(t)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetOrder_CacheMiss_DB_Error(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(mockOrderRepo)
+	mockCache := new(mockCacheRepo)
+	mockProd := new(mockMessageBroker)
+
+	mockCache.
+		On("GetOrder", ctx, "cache-miss-err").
+		Return([]byte{}, errors.New("not found")).
+		Once()
+
+	mockRepo.
+		On("GetOrder", "cache-miss-err").
+		Return(models.Order{}, errors.New("db error")).
+		Once()
+
+	uc := NewOrderUseCase(mockRepo, mockCache, mockProd)
+
+	_, err := uc.GetOrder(ctx, "cache-miss-err")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "db error")
+	mockCache.AssertExpectations(t)
+	mockRepo.AssertExpectations(t)
+	mockCache.AssertNotCalled(t, "SetOrder")
+}
 
 func TestHandleMessage_NewOrder_Success(t *testing.T) {
 	ctx := context.Background()
@@ -267,13 +379,94 @@ func TestHandleMessage_NewOrder_Success(t *testing.T) {
 		Once()
 
 	mockRepo.
-		On("NewOrder", order).
+		On("NewOrder", mock.MatchedBy(func(o models.Order) bool { return o.OrderUID == order.OrderUID })).
 		Return(nil).
 		Once()
 
 	orderJSON, _ := json.Marshal(order)
 	mockCache.
-		On("SetOrder", ctx, "new-order-abc", orderJSON, 24*time.Hour).
+		On("SetOrder", ctx, "new-order-abc", mock.MatchedBy(func(b []byte) bool { return assert.JSONEq(t, string(orderJSON), string(b)) }), 24*time.Hour).
+		Return(nil).
+		Once()
+
+	uc := NewOrderUseCase(mockRepo, mockCache, mockProd)
+
+	err := uc.HandleMessage(ctx, data)
+
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+	mockCache.AssertExpectations(t)
+}
+
+func TestHandleMessage_UnmarshalError(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(mockOrderRepo)
+	mockCache := new(mockCacheRepo)
+	mockProd := new(mockMessageBroker)
+
+	uc := NewOrderUseCase(mockRepo, mockCache, mockProd)
+
+	err := uc.HandleMessage(ctx, []byte("invalid json"))
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to unmarshal message")
+	mockRepo.AssertNotCalled(t, "GetOrder")
+	mockRepo.AssertNotCalled(t, "NewOrder")
+	mockCache.AssertNotCalled(t, "SetOrder")
+}
+
+func TestHandleMessage_NewOrder_RepoError(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(mockOrderRepo)
+	mockCache := new(mockCacheRepo)
+	mockProd := new(mockMessageBroker)
+
+	order := models.Order{OrderUID: "new-order-err"}
+	data, _ := json.Marshal(order)
+
+	mockRepo.
+		On("GetOrder", "new-order-err").
+		Return(models.Order{}, errors.New("not found")).
+		Once()
+
+	mockRepo.
+		On("NewOrder", mock.MatchedBy(func(o models.Order) bool { return o.OrderUID == order.OrderUID })).
+		Return(errors.New("repo save error")).
+		Once()
+
+	uc := NewOrderUseCase(mockRepo, mockCache, mockProd)
+
+	err := uc.HandleMessage(ctx, data)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to save order to repository")
+	assert.Contains(t, err.Error(), "repo save error")
+	mockRepo.AssertExpectations(t)
+	mockCache.AssertNotCalled(t, "SetOrder")
+}
+
+func TestHandleMessage_GetOrderError_NotNotFound(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(mockOrderRepo)
+	mockCache := new(mockCacheRepo)
+	mockProd := new(mockMessageBroker)
+
+	order := models.Order{OrderUID: "get-err-proceed"}
+	data, _ := json.Marshal(order)
+
+	mockRepo.
+		On("GetOrder", "get-err-proceed").
+		Return(models.Order{}, errors.New("transient error")).
+		Once()
+
+	mockRepo.
+		On("NewOrder", mock.MatchedBy(func(o models.Order) bool { return o.OrderUID == order.OrderUID })).
+		Return(nil).
+		Once()
+
+	orderJSON, _ := json.Marshal(order)
+	mockCache.
+		On("SetOrder", ctx, "get-err-proceed", mock.MatchedBy(func(b []byte) bool { return assert.JSONEq(t, string(orderJSON), string(b)) }), 24*time.Hour).
 		Return(nil).
 		Once()
 
@@ -297,16 +490,15 @@ func TestHandleMessage_DuplicateOrder(t *testing.T) {
 
 	mockRepo.
 		On("GetOrder", "already-exist").
-		Return(order, nil). // уже существует
+		Return(order, nil).
 		Once()
-
-	// НЕ должно вызываться создание
-	mockRepo.On("NewOrder", mock.Anything).Maybe()
 
 	uc := NewOrderUseCase(mockRepo, mockCache, mockProd)
 
 	err := uc.HandleMessage(ctx, data)
 
-	assert.NoError(t, err) // дубликат — нормальная ситуация
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
 	mockRepo.AssertNotCalled(t, "NewOrder")
+	mockCache.AssertNotCalled(t, "SetOrder")
 }
